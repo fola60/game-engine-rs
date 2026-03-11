@@ -89,7 +89,7 @@ impl ApplicationHandler for AppWindow {
                         println!("Unable to render {}", e);
                     }
                 }
-            }
+            },
             _ => {}
         }
 
