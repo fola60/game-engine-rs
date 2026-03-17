@@ -15,7 +15,7 @@ pub struct AppWindow {
     pub screen_width: u32,
     pub screen_height: u32,
     title: String,
-    state: Option<State>
+    pub state: Option<State>
 }
 
 impl ApplicationHandler for AppWindow {
@@ -78,17 +78,7 @@ impl ApplicationHandler for AppWindow {
             } => state.handle_key(event_loop, code, key_state.is_pressed()),
             WindowEvent::SurfaceResized(size) => state.resize(size.width, size.height),
             WindowEvent::PointerMoved { device_id: _, position, primary, source } => {
-                match state.handle_mouse_moved(position, primary, source) {
-                    Ok(_) => {}
-                    // Reconfigure the surface if it's lost or outdated
-                    Err(wgpu::SurfaceError::Lost | wgpu::SurfaceError::Outdated) => {
-                        let size = state.window.surface_size();
-                        state.resize(size.width, size.height);
-                    }
-                    Err(e) => {
-                        println!("Unable to render {}", e);
-                    }
-                }
+                
             },
             _ => {}
         }
@@ -103,7 +93,7 @@ impl AppWindow {
         Self { window: None, screen_height, screen_width, title, state: None }
     }
 
-    pub fn init_window(mut self) -> anyhow::Result<()> {
+    pub fn init_window(self) -> anyhow::Result<()> {
         // Create a new event loop.
         let event_loop = EventLoop::new()?;
 
