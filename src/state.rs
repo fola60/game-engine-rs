@@ -7,9 +7,93 @@ use crate::{
 };
 
 
+pub struct Entity {
+    vertex_buffer: wgpu::Buffer,
+    index_buffer: wgpu::Buffer,
+    instances: Vec<Instance>,
+    instance_buffer: wgpu::Buffer,
+    num_indices: u32,
+    diffuse_bind_group: Option<wgpu::BindGroup>,
+    diffuse_texture: Option<Texture>
+}
+
+impl Entity {
+    fn new_rectangle(device: &mut wgpu::Device ,vertexes: [Vertex; 4]) -> Entity {
+        let vertex_buffer = device.create_buffer_init(
+            &wgpu::util::BufferInitDescriptor {
+                label: Some("Vertex Buffer"),
+                contents: bytemuck::cast_slice(&vertexes),
+                usage: wgpu::BufferUsages::VERTEX,
+            }
+        );
+
+        let indicies = [
+            0, 1, 2,
+            1, 2, 3 
+        ];
+
+        let index_buffer = device.create_buffer_init(
+        &wgpu::util::BufferInitDescriptor {
+            label: Some("Index Buffer"),
+            contents: bytemuck::cast_slice(&indicies),
+            usage: wgpu::BufferUsages::INDEX,
+            }
+        );
+
+        let num_instances_per_row: u32 = 10;
+        let instance_displacement: cgmath::Vector3<f32> = cgmath::Vector3::new(num_instances_per_row as f32 * 0.0, 0.0, num_instances_per_row as f32 * 0.0);
 
 
+        let instances = (0..num_instances_per_row).flat_map(|z| {
+            (0..num_instances_per_row).map(move |x| {
+                let position = cgmath::Vector3 { x: x as f32, y: 0.0, z: z as f32 } - instance_displacement;
 
+                let rotation = if position.is_zero() {
+                    // this is needed so an object at (0, 0, 0) won't get scaled to zero
+                    // as Quaternions can affect scale if they're not created correctly
+                    cgmath::Quaternion::from_axis_angle(cgmath::Vector3::unit_z(), cgmath::Deg(0.0))
+                } else {
+                    cgmath::Quaternion::from_axis_angle(position.normalize(), cgmath::Deg(45.0))
+                };
+
+                Instance {
+                    position, rotation,
+                }
+            })
+        }).collect::<Vec<_>>();
+
+        let instance_data = instances.iter().map(Instance::to_raw).collect::<Vec<_>>();
+        let instance_buffer = device.create_buffer_init(
+            &wgpu::util::BufferInitDescriptor {
+                label: Some("Instance Buffer"),
+                contents: bytemuck::cast_slice(&instance_data),
+                usage: wgpu::BufferUsages::VERTEX,
+            }
+        );
+
+        Entity { vertex_buffer, index_buffer, instance_buffer, instances, num_indices: indicies.len() as u32, diffuse_bind_group: None, diffuse_texture: None }
+    }
+}
+
+
+pub struct Renderer {
+    entities: Vec<Entity>
+}
+
+impl Renderer {
+    pub fn draw_circle(&self, location: Point2D, radius: u32) {
+        
+    }
+
+    pub fn draw_rectangle(&mut self, device: &mut wgpu::Device, location: Point2D, width: u32, height: u32) {
+        let top_right = Vertex { position: [location.x + 1.0 / width as f32, location.y, 0.0], tex_coords: [0.0, 0.0]};
+        let top_left = Vertex { position: [location.x, location.y, 0.0], tex_coords: [0.0, 0.0]};
+        let bottom_left = Vertex { position: [location.x, location.y - (1.0 / height as f32), 0.0], tex_coords: [0.0, 0.0]};
+        let bottom_right = Vertex { position: [location.x + 1.0 / width as f32, location.y - (1.0 / height as f32), 0.0], tex_coords: [0.0, 0.0]};
+        let entity = Entity::new_rectangle(device, [top_left, top_right, bottom_left, bottom_right]);
+        self.entities.push(entity);
+    }
+}
 
 pub struct State {
     pub surface: wgpu::Surface<'static>,
@@ -32,6 +116,7 @@ pub struct State {
     pub swap: bool,
     pub instances: Vec<Instance>,
     pub instance_buffer: wgpu::Buffer,
+    pub renderer: Renderer
 }
 
 
@@ -322,7 +407,8 @@ impl State {
             camera_controller,
             swap: true,
             instances,
-            instance_buffer
+            instance_buffer,
+            renderer: Renderer { entities: vec![] }
         })
 
     }
@@ -410,8 +496,15 @@ impl State {
             render_pass.set_index_buffer(self.index_buffer.slice(..), wgpu::IndexFormat::Uint16);
             render_pass.draw_indexed(0..self.num_indices, 0, 0..self.instances.len() as _);
 
+            for entity in &self.renderer.entities {
+                render_pass.set_pipeline(&self.render_pipeline);
+                render_pass.set_bind_group(1, &self.camera_bind_group, &[]);
+                render_pass.set_vertex_buffer(0, entity.vertex_buffer.slice(..));
+                render_pass.set_vertex_buffer(1, entity.instance_buffer.slice(..));
+                render_pass.set_index_buffer(entity.index_buffer.slice(..), wgpu::IndexFormat::Uint16);
+                render_pass.draw_indexed(0..entity.num_indices, 0, 0..entity.instances.len() as u32);
+            }
         }
-
 
 
         // submit will accept anything that implements IntoIter

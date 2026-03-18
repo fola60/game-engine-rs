@@ -11,9 +11,6 @@ pub(crate) struct CameraController {
 }
 
 
-
-
-
 impl CameraController {
     pub(crate) fn new(eye: Point2D) -> Self {
         Self {
@@ -95,6 +92,8 @@ pub struct Camera {
     pub(crate) zfar: f32,
     pub(crate) rotation: f32
 }
+
+
 
 #[rustfmt::skip]
 pub const OPENGL_TO_WGPU_MATRIX: cgmath::Matrix4<f32> = cgmath::Matrix4::from_cols(

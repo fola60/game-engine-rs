@@ -1,6 +1,9 @@
 use std::sync::Arc;
 
-use crate::{Color, Entity};
+
+use crate::camera::Camera;
+use crate::state::Renderer;
+use crate::{Color, Entity, Vertex};
 use crate::{
     state::{State},
     Point2D
@@ -14,7 +17,41 @@ use winit::event_loop::{ActiveEventLoop, ControlFlow, EventLoop};
 use winit::keyboard::PhysicalKey;
 use winit::window::{Window, WindowId, WindowAttributes};
 
-pub struct Engine {
+
+
+pub struct EngineContext<'a> {
+    pub entities: &'a mut Vec<Entity>,
+    pub camera: &'a mut Camera,
+    pub renderer: &'a Renderer,
+    pub device: &'a wgpu::Device
+}
+
+impl<'a> EngineContext<'a> {
+    pub fn clear_background(&mut self, color: Color) {
+        
+    }
+    
+    pub fn draw_circle(&mut self, location: Point2D, radius: u128) {
+
+    }
+
+    pub fn add_entity(&mut self, entity: Entity) {
+        self.entities.push(entity);
+    }
+
+
+    pub fn draw_rectangle(&mut self, location: Point2D, width: u32, height: u32) {
+
+    }
+
+    pub fn draw_text(&mut self, location: Point2D, text: &str, font_size: u8) {
+    
+    }
+}
+
+
+pub struct Engine<G: GameLoop + 'static > {
+    game: G,
     pub window: Option<Arc<dyn Window>>,
     screen_width: u32,
     screen_height: u32,
@@ -28,9 +65,10 @@ pub struct Engine {
     camera_zoom: f32
 }
 
-impl Engine {
-    pub fn init(screen_width: u32, screen_height: u32, title: &str) -> Engine {
+impl<G: GameLoop> Engine<G> {
+    pub fn init(game: G, screen_width: u32, screen_height: u32, title: &str) -> Engine<G> {
         Self { 
+            game,
             window: None,
             screen_width, 
             screen_height, 
@@ -122,7 +160,7 @@ impl Engine {
 
 }
 
-impl ApplicationHandler for Engine {
+impl<G: GameLoop> ApplicationHandler for Engine<G> {
     fn can_create_surfaces(&mut self, event_loop: &dyn ActiveEventLoop) {
         let mut window_attributes = WindowAttributes::default();
         window_attributes.surface_size = Some(Size::Physical(PhysicalSize {
@@ -167,7 +205,6 @@ impl ApplicationHandler for Engine {
             None => return,
         };
         
-
         match event {
             WindowEvent::CloseRequested => event_loop.exit(),
             WindowEvent::RedrawRequested => {
@@ -186,24 +223,36 @@ impl ApplicationHandler for Engine {
             },
             WindowEvent::KeyboardInput {
                 event:
-                    KeyEvent {
-                        physical_key: PhysicalKey::Code(code),
-                        state: key_state,
-                        ..
-                    },
+                KeyEvent {
+                    physical_key: PhysicalKey::Code(code),
+                    state: key_state,
+                    ..
+                },
                 ..
             } => state.handle_key(event_loop, code, key_state.is_pressed()),
             WindowEvent::SurfaceResized(size) => { 
                 state.resize(size.width, size.height)
-            },
-            WindowEvent::PointerMoved { device_id: _, position, primary, source } => {
-                
-            },
+            }
             _ => {}
         }
-
+        let mut ctx = EngineContext {
+            entities: &mut self.entities,
+            camera: &mut state.camera,
+            renderer: &mut state.renderer
+        };
+        self.game.game_loop(&mut ctx, event);
     }
 
     
+}
+
+pub trait GameLoop {
+    fn game_loop(
+        &mut self,
+        ctx: &mut EngineContext,
+        event: WindowEvent
+    ) {
+
+    }
 }
 
