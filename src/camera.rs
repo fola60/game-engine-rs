@@ -26,10 +26,10 @@ impl CameraController {
     }
 
     pub(crate) fn update_camera(&self, camera: &mut Camera, width: u32, height: u32) {
-        camera.eye = Point3 {x: self.eye.x + self.offset.x, y: self.eye.y + self.offset.y, z: 0.0};
-        camera.target = Point3 {x: self.target.x, y: self.target.y, z: -1.0};
+        camera.eye = Point3 {x: camera.eye.x + self.offset.x, y: self.eye.y + self.offset.y, z: camera.eye.z};
+        camera.target = Point3 {x: camera.target.x, y: camera.target.y, z: camera.target.z};
         camera.rotation = self.rotation;
-        camera.aspect = (width as f32 / height as f32);
+        camera.aspect = width as f32 / height as f32;
     }
 
     

@@ -5,6 +5,7 @@ pub mod engine;
 pub mod state;
 pub mod texture;
 pub mod camera;
+pub mod renderer;
 
 
 // Draw a 2d circle 
@@ -36,7 +37,7 @@ pub enum Color {
 // lib.rs
 #[repr(C)]
 #[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
-struct Vertex {
+pub struct Vertex {
     position: [f32; 3],
     tex_coords: [f32; 2]
 }
@@ -67,7 +68,7 @@ impl Vertex {
 
 
 
-const VERTICES: &[Vertex] = &[
+pub const VERTICES: &[Vertex] = &[
     Vertex { position: [-0.0868241, 0.49240386, -1.0], tex_coords: [0.4131759, 0.00759614], }, // A
     Vertex { position: [-0.49513406, 0.06958647, -1.0], tex_coords: [0.0048659444, 0.43041354], }, // B
     Vertex { position: [-0.21918549, -0.44939706, -1.0], tex_coords: [0.28081453, 0.949397], }, // C
@@ -76,7 +77,7 @@ const VERTICES: &[Vertex] = &[
 ];
 
 
-const INDICES: &[u16] = &[
+pub const INDICES: &[u16] = &[
     0, 1, 4,
     1, 2, 4,
     2, 3, 4,
@@ -146,14 +147,7 @@ struct Size {
     height: u32
 }
 
-struct Entity {
-    pub position: Point2D,
-    pub size: Size
-}
 
-impl Entity {
-
-}
 
 #[cfg(test)]
 mod tests {

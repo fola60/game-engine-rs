@@ -2,14 +2,15 @@ use std::sync::Arc;
 
 
 use crate::camera::Camera;
-use crate::state::Renderer;
-use crate::{Color, Entity, Vertex};
+use crate::renderer::{Entity, EntityType, Renderer, VertexIndicie};
+use crate::{Color, Vertex};
 use crate::{
     state::{State},
     Point2D
 };
 
 
+use cgmath::Point3;
 use winit::application::ApplicationHandler;
 use winit::dpi::{PhysicalSize, Size};
 use winit::event::{KeyEvent, WindowEvent};
@@ -21,9 +22,9 @@ use winit::window::{Window, WindowId, WindowAttributes};
 
 pub struct EngineContext<'a> {
     pub entities: &'a mut Vec<Entity>,
-    pub camera: &'a mut Camera,
-    pub renderer: &'a Renderer,
-    pub device: &'a wgpu::Device
+    camera: &'a mut Camera,
+    renderer: &'a mut Renderer,
+    device: &'a wgpu::Device
 }
 
 impl<'a> EngineContext<'a> {
@@ -39,9 +40,60 @@ impl<'a> EngineContext<'a> {
         self.entities.push(entity);
     }
 
+    pub fn set_camera_eye(&mut self, eye: Point3<f32>) {
+        self.camera.eye = eye;
+    }
 
-    pub fn draw_rectangle(&mut self, location: Point2D, width: u32, height: u32) {
+    pub fn set_camera_target(&mut self, target: Point3<f32>) {
+        self.camera.target = target;
+    }
 
+    pub fn get_camera_eye(&self) -> Point3<f32> {
+        self.camera.eye
+    }
+
+    pub fn get_camera_target(&self) -> Point3<f32> {
+        self.camera.target
+    }
+
+    pub fn add_entity_vertex_data(&mut self, vertexes: Vec<Vertex>, indicies: Vec<u16>, entity_type: EntityType ) {
+        let data = VertexIndicie { vertexes, indicies, entity_type};
+        self.renderer.entity_vertex_data.push(data);
+    }
+
+
+    pub fn draw_rectangle(&mut self, location: Point2D, width: f32, height: f32) {
+        let z = -1.0;
+        let top_left = Vertex { 
+            position: [location.x, location.y, 0.0], 
+            tex_coords: [0.0, 1.0]
+        };
+
+        let top_right = Vertex { 
+            position: [location.x + width as f32, location.y, 0.0], 
+            tex_coords: [1.0, 1.0]
+        };
+
+        let bottom_left = Vertex { 
+            position: [location.x, location.y - height, 0.0], 
+            tex_coords: [0.0, 0.0]
+        };
+
+        let bottom_right = Vertex { 
+            position: [location.x +  width, location.y - height, 0.0], 
+            tex_coords: [1.0, 0.0]
+        };
+
+        // println!("top_left:   {:?}", top_left.position);
+        // println!("top_right:  {:?}", top_right.position);
+        // println!("bottom_left:{:?}", bottom_left.position);
+        // println!("bottom_right:{:?}", bottom_right.position);
+        let entity_vertex_data = VertexIndicie { 
+            vertexes: vec![top_left, top_right, bottom_left, bottom_right], indicies: vec![0, 1, 2, 2, 1, 3], entity_type: EntityType::Rectangle
+        };
+
+        
+        self.renderer.entity_vertex_data.push(entity_vertex_data);
     }
 
     pub fn draw_text(&mut self, location: Point2D, text: &str, font_size: u8) {
@@ -205,6 +257,7 @@ impl<G: GameLoop> ApplicationHandler for Engine<G> {
             None => return,
         };
         
+        
         match event {
             WindowEvent::CloseRequested => event_loop.exit(),
             WindowEvent::RedrawRequested => {
@@ -235,13 +288,16 @@ impl<G: GameLoop> ApplicationHandler for Engine<G> {
             }
             _ => {}
         }
+
         let mut ctx = EngineContext {
             entities: &mut self.entities,
             camera: &mut state.camera,
-            renderer: &mut state.renderer
+            renderer: &mut state.renderer,
+            device: &mut state.device
         };
         self.game.game_loop(&mut ctx, event);
     }
+
 
     
 }
@@ -255,4 +311,3 @@ pub trait GameLoop {
 
     }
 }
-
