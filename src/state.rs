@@ -3,7 +3,7 @@ use winit::{dpi::PhysicalPosition, event::PointerSource, event_loop::ActiveEvent
 use wgpu::util::DeviceExt;
 use cgmath::{InnerSpace, Rotation3, Vector3, Zero, prelude};
 use crate::{
-    INDICES, Instance, InstanceRaw, Point2D, VERTICES, Vertex, camera::{Camera, CameraController, CameraUniform}, renderer::{Entity, EntityType, Renderer}, texture::Texture
+    Color, INDICES, Instance, InstanceRaw, Mode, Point2D, VERTICES, Vertex, camera::{Camera, CameraController, CameraUniform}, renderer::{Entity, EntityType, Renderer}, texture::Texture
 };
 
 
@@ -30,7 +30,9 @@ pub struct State {
     pub swap: bool,
     pub instances: Vec<Instance>,
     pub instance_buffer: wgpu::Buffer,
-    pub renderer: Renderer
+    pub renderer: Renderer,
+    pub background: Color,
+    pub mode: Mode
 }
 
 
@@ -324,7 +326,9 @@ impl State {
             swap: true,
             instances,
             instance_buffer,
-            renderer: Renderer { entity_vertex_data: vec![], screen_width, screen_height}
+            renderer: Renderer { entity_vertex_data: vec![], screen_width, screen_height},
+            background: Color::default(),
+            mode: Mode::MODE2D
         })
 
     }
@@ -357,6 +361,14 @@ impl State {
 
     pub fn update(&mut self) {
         self.camera_controller.update_camera(&mut self.camera, self.config.width, self.config.height);
+        match self.mode {
+            Mode::MODE2D => {
+                self.camera_uniform.update_view_proj(&Camera::get_2d_camera(self.config.width as f32, self.config.height as f32))
+            },
+            Mode::Mode3D => {
+                self.camera_uniform.update_view_proj(&self.camera)
+            }
+        }
         self.camera_uniform.update_view_proj(&self.camera);
         self.queue.write_buffer(&self.camera_buffer, 0, bytemuck::cast_slice(&[self.camera_uniform]));
     }
@@ -390,10 +402,10 @@ impl State {
                     depth_slice: None,
                     ops: wgpu::Operations {
                         load: wgpu::LoadOp::Clear(wgpu::Color {
-                            r: 0.1,
-                            g: 0.2,
-                            b: 0.3,
-                            a: 1.0,
+                            r: self.background.r,
+                            g: self.background.g,
+                            b: self.background.b,
+                            a: self.background.a,
                         }),
                         store: wgpu::StoreOp::Store,
                     },
@@ -419,7 +431,10 @@ impl State {
                     },
                     EntityType::VertIndicie => { 
                         entities.push(Entity::new(&mut self.device, entity_vertex_data, 1, Vector3 {x: 0.0, y: 0.0, z: 0.0}))
-                    }
+                    },
+                    EntityType::Circle => {
+                        entities.push(Entity::new(&mut self.device, entity_vertex_data, 1, Vector3 {x: 0.0, y: 0.0, z: 0.0}))
+                    },
                     _ => {}
                 }
             }

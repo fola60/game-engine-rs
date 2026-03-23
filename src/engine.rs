@@ -3,7 +3,7 @@ use std::sync::Arc;
 
 use crate::camera::Camera;
 use crate::renderer::{Entity, EntityType, Renderer, VertexIndicie};
-use crate::{Color, Vertex};
+use crate::{Color, Mode, Vertex};
 use crate::{
     state::{State},
     Point2D
@@ -24,16 +24,58 @@ pub struct EngineContext<'a> {
     pub entities: &'a mut Vec<Entity>,
     camera: &'a mut Camera,
     renderer: &'a mut Renderer,
-    device: &'a wgpu::Device
+    device: &'a wgpu::Device,
+    background: &'a mut Color,
+    mode: &'a mut Mode
 }
 
 impl<'a> EngineContext<'a> {
     pub fn clear_background(&mut self, color: Color) {
-        
+        *self.background = color;      
     }
     
-    pub fn draw_circle(&mut self, location: Point2D, radius: u128) {
+    pub fn draw_circle(&mut self, location: Point2D, radius: f32) {
 
+        let segments = 32; // increase for smoother circle
+
+        let mut vertices = vec![];
+        let mut indices = vec![];
+
+        // center vertex
+        vertices.push(Vertex {
+            position: [location.x, location.y, 0.0],
+            tex_coords: [0.5, 0.5],
+        });
+
+        // outer ring
+        for i in 0..=segments {
+            let angle = (i as f32 / segments as f32) * std::f32::consts::TAU;
+            let x = location.x + radius * angle.cos();
+            let y = location.y + radius * angle.sin();
+
+            vertices.push(Vertex {
+                position: [x, y, 0.0],
+                tex_coords: [0.0, 0.0],
+            });
+        }
+
+        // indices (triangle fan)
+        for i in 1..=segments {
+            indices.push(i as u16);
+            indices.push(0);
+            indices.push((i + 1) as u16);
+        }
+
+        let data = VertexIndicie {
+            vertexes: vertices,
+            indicies: indices,
+            entity_type: EntityType::Circle,
+        };
+
+        self.renderer.entity_vertex_data.push(data);
+    }
+    pub fn set_mode(&mut self, mode: Mode) {
+        *self.mode = mode;
     }
 
     pub fn add_entity(&mut self, entity: Entity) {
@@ -293,7 +335,9 @@ impl<G: GameLoop> ApplicationHandler for Engine<G> {
             entities: &mut self.entities,
             camera: &mut state.camera,
             renderer: &mut state.renderer,
-            device: &mut state.device
+            device: &mut state.device,
+            background: &mut state.background,
+            mode: &mut state.mode
         };
         self.game.game_loop(&mut ctx, event);
     }

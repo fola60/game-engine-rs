@@ -1,10 +1,9 @@
 use cgmath::Point3;
 use game_engine_rs::{
-    Point2D,
-    camera, 
-    engine::{Engine, EngineContext, GameLoop},
-    renderer::{EntityType},
-    VERTICES, INDICES
+    Color, 
+    Point2D, 
+    engine::{Engine, EngineContext, GameLoop}, 
+    Mode
 };
 
 use winit::{event::{KeyEvent, WindowEvent}, keyboard::{KeyCode, PhysicalKey}};
@@ -21,12 +20,13 @@ impl GameLoop for MyGame {
         ctx: &mut EngineContext,
         event: WindowEvent,
     ) {
-        let width = 2.0;
-        let height = 2.0;
-        ctx.draw_rectangle(Point2D {x: -0.5, y: 0.5}, width, height);
-        ctx.draw_rectangle(Point2D {x: 3.5, y: 0.5}, width, height);
+        ctx.set_mode(Mode::MODE2D);
+        ctx.clear_background(Color {r: 255.0, g: 255.0, b: 255.0, a: 0.0 });
+        let width = 0.5;
+        let height = 0.5;
+        // ctx.draw_rectangle(Point2D {x: -0.5, y: 0.5}, width, height);
+        ctx.draw_circle(Point2D {x: -0.5, y: 0.5}, 0.5);
 
-        // ctx.add_entity_vertex_data(VERTICES.to_vec(), INDICES.to_vec(), EntityType::VertIndicie);
         match event {
             WindowEvent::KeyboardInput { device_id: _, event, is_synthetic: _ } => {
                 match event.physical_key {
@@ -54,8 +54,8 @@ impl GameLoop for MyGame {
 }
 
 fn main() -> anyhow::Result<()> {
-    let my_game = MyGame {camera_eye: Point3 { x: 0.0, y: 0.0, z: -2.0 }, camera_target: Point3 { x: 0.5, y: 0.5, z: 0.0 }};
-    let app = Engine::init(my_game, 700, 600, "100x200 app window title.");
+    let my_game = MyGame {camera_eye: Point3 { x: 0.0, y: -0.5, z: -5.0 }, camera_target: Point3 { x: 0.5, y: 0.5, z: 0.0 }};
+    let app = Engine::init(my_game, 700, 600, "Game engine");
     app.run()
 
 }

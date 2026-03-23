@@ -28,12 +28,18 @@ impl Default for Point2D {
     }
 }
 
-pub enum Color {
-    Red,
-    Green,
-    Blue
+pub struct Color {
+    pub r: f64,
+    pub g: f64,
+    pub b: f64,
+    pub a: f64
 }
 
+impl Default for Color {
+    fn default() -> Self {
+        Color { r: 0.0, g: 0.0, b: 0.0, a: 0.0 }
+    }
+}
 // lib.rs
 #[repr(C)]
 #[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
@@ -145,6 +151,11 @@ impl InstanceRaw {
 struct Size {
     width: u32,
     height: u32
+}
+
+pub enum Mode {
+    MODE2D,
+    Mode3D
 }
 
 

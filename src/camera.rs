@@ -113,4 +113,17 @@ impl Camera {
         // 3.
         return OPENGL_TO_WGPU_MATRIX * proj * view;
     }
+
+    pub(crate) fn get_2d_camera(width: f32, height: f32) -> Self {
+        Camera { 
+            eye: cgmath::Point3 { x: 0.0, y: 0.0, z: 1.0 },  
+            target: cgmath::Point3 { x: 0.0, y: 0.0, z: 0.0 }, 
+            up: cgmath::Vector3 { x: 0.0, y: 1.0, z: 0.0 }, 
+            aspect: width / height, 
+            fovy: 1.0, // 
+            znear: 0.1, 
+            zfar: 10.0, 
+            rotation: 0.0,
+    }
+}
 }
