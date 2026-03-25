@@ -2,15 +2,16 @@ use std::sync::Arc;
 
 
 use crate::camera::Camera;
-use crate::renderer::{Entity, EntityType, Renderer, VertexIndicie};
+use crate::renderer::{EntityType, Renderer, VertexIndicie};
 use crate::{Color, Mode, Vertex};
+use crate::entity::{Entity};
 use crate::{
     state::{State},
     Point2D
 };
 
 
-use cgmath::Point3;
+use cgmath::{Point3, Vector3};
 use winit::application::ApplicationHandler;
 use winit::dpi::{PhysicalSize, Size};
 use winit::event::{KeyEvent, WindowEvent};
@@ -21,12 +22,12 @@ use winit::window::{Window, WindowId, WindowAttributes};
 
 
 pub struct EngineContext<'a> {
-    pub entities: &'a mut Vec<Entity>,
+    entities: &'a mut Vec<Entity>,
     camera: &'a mut Camera,
     renderer: &'a mut Renderer,
-    device: &'a wgpu::Device,
     background: &'a mut Color,
-    mode: &'a mut Mode
+    mode: &'a mut Mode,
+    text: &'a mut Vec<(String, f32, f32, u8)>
 }
 
 impl<'a> EngineContext<'a> {
@@ -72,7 +73,8 @@ impl<'a> EngineContext<'a> {
             entity_type: EntityType::Circle,
         };
 
-        self.renderer.entity_vertex_data.push(data);
+
+        self.entities.push(Entity::new(data, 1, Vector3 {x: 0.0, y: 0.0, z: 0.0}));
     }
     pub fn set_mode(&mut self, mode: Mode) {
         *self.mode = mode;
@@ -98,10 +100,6 @@ impl<'a> EngineContext<'a> {
         self.camera.target
     }
 
-    pub fn add_entity_vertex_data(&mut self, vertexes: Vec<Vertex>, indicies: Vec<u16>, entity_type: EntityType ) {
-        let data = VertexIndicie { vertexes, indicies, entity_type};
-        self.renderer.entity_vertex_data.push(data);
-    }
 
 
     pub fn draw_rectangle(&mut self, location: Point2D, width: f32, height: f32) {
@@ -126,20 +124,17 @@ impl<'a> EngineContext<'a> {
             tex_coords: [1.0, 0.0]
         };
 
-        // println!("top_left:   {:?}", top_left.position);
-        // println!("top_right:  {:?}", top_right.position);
-        // println!("bottom_left:{:?}", bottom_left.position);
-        // println!("bottom_right:{:?}", bottom_right.position);
         let entity_vertex_data = VertexIndicie { 
             vertexes: vec![top_left, top_right, bottom_left, bottom_right], indicies: vec![0, 1, 2, 2, 1, 3], entity_type: EntityType::Rectangle
         };
 
         
-        self.renderer.entity_vertex_data.push(entity_vertex_data);
+        self.entities.push(Entity::new(entity_vertex_data, 1, Vector3 {x: 0.0, y: 0.0, z: 0.0}));
     }
 
+    // draws text, relative to the camera position, (0.0, 0.0) is top right
     pub fn draw_text(&mut self, location: Point2D, text: &str, font_size: u8) {
-    
+        self.text.push((String::from(text), location.x, location.y, font_size));
     }
 }
 
@@ -193,63 +188,9 @@ impl<G: GameLoop> Engine<G> {
         Ok(())
     }
     
-    pub fn close_window(&self) {
-        
-    }
-    
-    pub fn clear_background(&self, color: Color) {
-        
-    }
-    
-    pub fn draw_circle(&self, location: Point2D, radius: u128) {
-
-    }
-
     pub fn add_entity(&mut self, entity: Entity) {
-        self.entities.push(entity);
+        
     }
-
-
-    pub fn draw_rectangle(&self, location: Point2D, width: u32, height: u32) {
-
-    }
-
-    pub fn draw_text(&self, location: Point2D, text: &str, font_size: u8) {
-
-    }
-
-    pub fn set_camera_eye(&mut self, location: Point2D) {
-        self.camera_eye = location;
-    }
-
-    pub fn set_camera_target(&mut self, location: Point2D) {
-        self.camera_target = location;
-    }
-
-    pub fn set_camera_rotation(&mut self, angle: f32) {
-        self.camera_rotation = angle;
-    }
-
-    pub fn set_camera_offset(&mut self, offset: Point2D) {
-        self.camera_offset = offset;
-    }
-
-     pub fn get_camera_eye(&mut self) -> &Point2D {
-        &self.camera_eye
-    }
-
-    pub fn get_camera_target(&mut self) -> &Point2D {
-        &self.camera_target
-    }
-
-    pub fn get_camera_rotation(&mut self) -> f32 {
-        self.camera_rotation
-    }
-
-    pub fn get_camera_offset(&mut self) -> &Point2D {
-        &self.camera_offset
-    }
-
     
 
 }
@@ -332,12 +273,12 @@ impl<G: GameLoop> ApplicationHandler for Engine<G> {
         }
 
         let mut ctx = EngineContext {
-            entities: &mut self.entities,
+            entities: &mut state.entities,
             camera: &mut state.camera,
             renderer: &mut state.renderer,
-            device: &mut state.device,
             background: &mut state.background,
-            mode: &mut state.mode
+            mode: &mut state.mode,
+            text: &mut state.text,
         };
         self.game.game_loop(&mut ctx, event);
     }
@@ -351,6 +292,14 @@ pub trait GameLoop {
         &mut self,
         ctx: &mut EngineContext,
         event: WindowEvent
+    ) {
+
+    }
+
+    fn startup (
+        &mut self,
+        ctx: &mut EngineContext,
+        event: WindowEvent,
     ) {
 
     }

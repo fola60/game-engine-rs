@@ -3,8 +3,19 @@ use winit::{dpi::PhysicalPosition, event::PointerSource, event_loop::ActiveEvent
 use wgpu::util::DeviceExt;
 use cgmath::{InnerSpace, Rotation3, Vector3, Zero, prelude};
 use crate::{
-    Color, INDICES, Instance, InstanceRaw, Mode, Point2D, VERTICES, Vertex, camera::{Camera, CameraController, CameraUniform}, renderer::{Entity, EntityType, Renderer}, texture::Texture
+    Color,
+    INDICES, 
+    Instance, 
+    InstanceRaw, 
+    Mode, 
+    Point2D, 
+    VERTICES, 
+    Vertex, 
+    camera::{Camera, CameraController, CameraUniform}, renderer::{EntityType, Renderer},
+    texture::Texture,
+    entity::Entity
 };
+
 
 
 
@@ -32,7 +43,10 @@ pub struct State {
     pub instance_buffer: wgpu::Buffer,
     pub renderer: Renderer,
     pub background: Color,
-    pub mode: Mode
+    pub mode: Mode,
+    pub text: Vec<(String, f32, f32, u8)>,
+    pub entities: Vec<Entity>
+
 }
 
 
@@ -226,7 +240,7 @@ impl State {
                 entry_point: Some("fs_main"),
                 targets: &[Some(wgpu::ColorTargetState { // 4.
                     format: config.format,
-                    blend: Some(wgpu::BlendState::REPLACE),
+                    blend: Some(wgpu::BlendState::ALPHA_BLENDING),
                     write_mask: wgpu::ColorWrites::ALL,
                 })],
                 compilation_options: wgpu::PipelineCompilationOptions::default(),
@@ -304,6 +318,7 @@ impl State {
 
         let screen_width = config.width;
         let screen_height = config.height;
+ 
 
         Ok(Self {
             surface,
@@ -328,7 +343,9 @@ impl State {
             instance_buffer,
             renderer: Renderer { entity_vertex_data: vec![], screen_width, screen_height},
             background: Color::default(),
-            mode: Mode::MODE2D
+            mode: Mode::MODE2D,
+            text: vec![],
+            entities: vec![]
         })
 
     }
@@ -423,30 +440,22 @@ impl State {
             // render_pass.set_vertex_buffer(1, self.instance_buffer.slice(..));
             // render_pass.set_index_buffer(self.index_buffer.slice(..), wgpu::IndexFormat::Uint16);
             // render_pass.draw_indexed(0..self.num_indices, 0, 0..self.instances.len() as _);
-            let mut entities: Vec<Entity> = vec![];
-            for entity_vertex_data in &self.renderer.entity_vertex_data {
-                match entity_vertex_data.entity_type {
-                    EntityType::Rectangle => {
-                        entities.push(Entity::new_rectangle(&mut self.device, entity_vertex_data));
-                    },
-                    EntityType::VertIndicie => { 
-                        entities.push(Entity::new(&mut self.device, entity_vertex_data, 1, Vector3 {x: 0.0, y: 0.0, z: 0.0}))
-                    },
-                    EntityType::Circle => {
-                        entities.push(Entity::new(&mut self.device, entity_vertex_data, 1, Vector3 {x: 0.0, y: 0.0, z: 0.0}))
-                    },
-                    _ => {}
-                }
-            }
 
-            for entity in &entities {
+            
+
+            self.renderer.entity_vertex_data.clear();
+            self.text.clear();
+
+            for entity in &self.entities {
+                println!("Number of instances: {}", entity.num_instances);
                 render_pass.set_pipeline(&self.render_pipeline);
                 render_pass.set_bind_group(1, &self.camera_bind_group, &[]);
-                render_pass.set_vertex_buffer(0, entity.vertex_buffer.slice(..));
-                render_pass.set_vertex_buffer(1, entity.instance_buffer.slice(..));
-                render_pass.set_index_buffer(entity.index_buffer.slice(..), wgpu::IndexFormat::Uint16);
-                render_pass.draw_indexed(0..entity.num_indices, 0, 0..entity.instances.len() as u32);
+                render_pass.set_vertex_buffer(0, entity.get_vertex_buffer(&mut self.device).slice(..));
+                render_pass.set_vertex_buffer(1, entity.get_instance_buffer(&mut self.device).slice(..));
+                render_pass.set_index_buffer(entity.get_index_buffer(&mut self.device).slice(..), wgpu::IndexFormat::Uint16);
+                render_pass.draw_indexed(0..entity.vertex_data.indicies.len() as u32, 0, 0..entity.num_instances as u32);
             }
+
         }
 
 

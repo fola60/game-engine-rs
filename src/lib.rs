@@ -6,7 +6,7 @@ pub mod state;
 pub mod texture;
 pub mod camera;
 pub mod renderer;
-
+pub mod entity;
 
 // Draw a 2d circle 
 
