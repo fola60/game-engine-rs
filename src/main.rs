@@ -21,9 +21,8 @@ impl GameLoop for MyGame {
     fn startup(
         &mut self,
         ctx: &mut EngineContext,
-        event: WindowEvent,
     ) {
-
+        ctx.add_circle(1, self.ball_pos.clone(), 0.5);
     }
 
     fn game_loop(
@@ -35,7 +34,7 @@ impl GameLoop for MyGame {
         // let width = 0.5;
         // let height = 0.5;
         // ctx.draw_rectangle(Point2D {x: -0.5, y: 0.5}, width, height);
-        ctx.draw_circle(self.ball_pos.clone(), 0.5);
+        ctx.draw_circle(1, position: Point2D);
         ctx.clear_background(Color { r: 255.0, g: 255.0, b: 255.0, a: 255.0 });
         match event {
             WindowEvent::KeyboardInput { device_id: _, event, is_synthetic: _ } => {

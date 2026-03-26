@@ -1,15 +1,17 @@
 use wgpu::util::DeviceExt;
-use cgmath::{InnerSpace, Rotation3, Zero};
+use cgmath::{InnerSpace, Rotation3, Vector3, Zero};
 use crate::{
     Instance, renderer::VertexIndicie, texture::Texture
 };
 
 pub struct Entity {
+    pub(crate) id: u32,
     pub(crate) vertex_data: VertexIndicie,
     pub(crate) num_instances: u32,
     pub(crate) instance_displacement: cgmath::Vector3<f32>,
     pub(crate) diffuse_bind_group: Option<wgpu::BindGroup>,
-    pub(crate) diffuse_texture: Option<Texture>
+    pub(crate) diffuse_texture: Option<Texture>,
+    pub(crate) position: Vector3<f32>
 }
 
 impl Entity {
@@ -66,14 +68,10 @@ impl Entity {
         instance_buffer
     }
 
-    pub (crate) fn new_rectangle(device: &mut wgpu::Device , vertex_data: VertexIndicie) -> Entity {
-        let num_instances_per_row: u32 = 1;
-        let instance_displacement: cgmath::Vector3<f32> = cgmath::Vector3::new(num_instances_per_row as f32 * 0.0, 0.0, num_instances_per_row as f32 * 0.0);
-        Entity { vertex_data, num_instances: num_instances_per_row, instance_displacement, diffuse_bind_group: None, diffuse_texture: None }
-    }
+    
 
-    pub(crate) fn new(vertex_data: VertexIndicie, num_instances_per_row: u32, instance_displacement: cgmath::Vector3<f32>) -> Entity {
+    pub(crate) fn new(id: u32, vertex_data: VertexIndicie, num_instances_per_row: u32, instance_displacement: cgmath::Vector3<f32>) -> Entity {
          
-        Entity {vertex_data, num_instances: num_instances_per_row, instance_displacement, diffuse_bind_group: None, diffuse_texture: None}
+        Entity {id, vertex_data, num_instances: num_instances_per_row, instance_displacement, diffuse_bind_group: None, diffuse_texture: None, position: Vector3 { x: 0.0, y: 0.0, z: 0.0 }}
     }
 }

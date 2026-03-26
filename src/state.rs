@@ -1,19 +1,9 @@
-use std::sync::Arc;
+use std::{collections::{HashMap, HashSet}, sync::Arc};
 use winit::{dpi::PhysicalPosition, event::PointerSource, event_loop::ActiveEventLoop, keyboard::KeyCode, window::Window};
 use wgpu::util::DeviceExt;
 use cgmath::{InnerSpace, Rotation3, Vector3, Zero, prelude};
 use crate::{
-    Color,
-    INDICES, 
-    Instance, 
-    InstanceRaw, 
-    Mode, 
-    Point2D, 
-    VERTICES, 
-    Vertex, 
-    camera::{Camera, CameraController, CameraUniform}, renderer::{EntityType, Renderer},
-    texture::Texture,
-    entity::Entity
+    Color, INDICES, Instance, InstanceRaw, Mode, Point2D, VERTICES, Vertex, camera::{Camera, CameraController, CameraUniform}, entity::{self, Entity}, renderer::{EntityType, Renderer}, texture::Texture
 };
 
 
@@ -45,8 +35,8 @@ pub struct State {
     pub background: Color,
     pub mode: Mode,
     pub text: Vec<(String, f32, f32, u8)>,
-    pub entities: Vec<Entity>
-
+    pub entities: HashMap<u32, Entity>,
+    pub entity_ids: HashSet<u32>
 }
 
 
@@ -345,7 +335,8 @@ impl State {
             background: Color::default(),
             mode: Mode::MODE2D,
             text: vec![],
-            entities: vec![]
+            entities: HashMap::new(),
+            entity_ids: HashSet::new()
         })
 
     }
@@ -446,8 +437,14 @@ impl State {
             self.renderer.entity_vertex_data.clear();
             self.text.clear();
 
-            for entity in &self.entities {
-                println!("Number of instances: {}", entity.num_instances);
+            println!("entity id length: {}", self.entity_ids.len());
+            println!("entity length: {}", self.entities.len());
+            for id in &self.entity_ids {
+                let entity = match self.entities.get(id) {
+                    Some(e) => e,
+                    None => continue,
+                };
+
                 render_pass.set_pipeline(&self.render_pipeline);
                 render_pass.set_bind_group(1, &self.camera_bind_group, &[]);
                 render_pass.set_vertex_buffer(0, entity.get_vertex_buffer(&mut self.device).slice(..));

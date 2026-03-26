@@ -1,3 +1,4 @@
+use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
 
@@ -22,7 +23,8 @@ use winit::window::{Window, WindowId, WindowAttributes};
 
 
 pub struct EngineContext<'a> {
-    entities: &'a mut Vec<Entity>,
+    entities: &'a mut HashMap<u32, Entity>,
+    entity_ids: &'a mut HashSet<u32>,
     camera: &'a mut Camera,
     renderer: &'a mut Renderer,
     background: &'a mut Color,
@@ -34,8 +36,12 @@ impl<'a> EngineContext<'a> {
     pub fn clear_background(&mut self, color: Color) {
         *self.background = color;      
     }
+
+    pub fn draw_circle(&mut self, id: u32, position: Point2D) -> bool {
+        self.entity_ids.insert(id)
+    }
     
-    pub fn draw_circle(&mut self, location: Point2D, radius: f32) {
+    pub fn add_circle(&mut self, id: u32, location: Point2D, radius: f32) {
 
         let segments = 32; // increase for smoother circle
 
@@ -74,14 +80,18 @@ impl<'a> EngineContext<'a> {
         };
 
 
-        self.entities.push(Entity::new(data, 1, Vector3 {x: 0.0, y: 0.0, z: 0.0}));
+        self.entities.insert(id, Entity::new(id, data, 1, Vector3 {x: 0.0, y: 0.0, z: 0.0}));
     }
     pub fn set_mode(&mut self, mode: Mode) {
         *self.mode = mode;
     }
 
-    pub fn add_entity(&mut self, entity: Entity) {
-        self.entities.push(entity);
+    pub fn draw_entity(&mut self, id: u32, entity: Entity) {
+        self.entities.insert(id, entity);
+    }
+
+    pub fn add_entity(&mut self, id: u32) -> bool {
+        self.entity_ids.insert(id)
     }
 
     pub fn set_camera_eye(&mut self, eye: Point3<f32>) {
@@ -101,8 +111,7 @@ impl<'a> EngineContext<'a> {
     }
 
 
-
-    pub fn draw_rectangle(&mut self, location: Point2D, width: f32, height: f32) {
+    pub fn draw_rectangle(&mut self, id: u32, location: Point2D, width: f32, height: f32) {
         let z = -1.0;
         let top_left = Vertex { 
             position: [location.x, location.y, 0.0], 
@@ -129,7 +138,7 @@ impl<'a> EngineContext<'a> {
         };
 
         
-        self.entities.push(Entity::new(entity_vertex_data, 1, Vector3 {x: 0.0, y: 0.0, z: 0.0}));
+        self.entities.insert(id, Entity::new(id, entity_vertex_data, 1, Vector3 {x: 0.0, y: 0.0, z: 0.0}));
     }
 
     // draws text, relative to the camera position, (0.0, 0.0) is top right
@@ -141,6 +150,7 @@ impl<'a> EngineContext<'a> {
 
 pub struct Engine<G: GameLoop + 'static > {
     game: G,
+    initialized: bool,
     pub window: Option<Arc<dyn Window>>,
     screen_width: u32,
     screen_height: u32,
@@ -158,6 +168,7 @@ impl<G: GameLoop> Engine<G> {
     pub fn init(game: G, screen_width: u32, screen_height: u32, title: &str) -> Engine<G> {
         Self { 
             game,
+            initialized: false,
             window: None,
             screen_width, 
             screen_height, 
@@ -208,24 +219,17 @@ impl<G: GameLoop> ApplicationHandler for Engine<G> {
             event_loop.create_window(window_attributes).unwrap()
         );
 
-        
-
         let mut state = pollster::block_on(State::new(window.clone()))
             .expect("Failed to create State");
-
-        
-        if let eye = self.camera_eye.clone() {
-            state.camera_controller.set_camera_eye(eye);
-        }
-        if let target = self.camera_target.clone() {
-            state.camera_controller.set_camera_target(target);
-        }
-        if let rot = self.camera_rotation {
-            state.camera_controller.set_camera_rotation(rot);
-        }
         
         self.window = Some(window);
         self.state = Some(state);
+
+        let state = match &mut self.state {
+            Some(canvas) => canvas,
+            None => return,
+        };
+
     }
 
     fn window_event(
@@ -271,15 +275,21 @@ impl<G: GameLoop> ApplicationHandler for Engine<G> {
             }
             _ => {}
         }
-
+        
         let mut ctx = EngineContext {
             entities: &mut state.entities,
+            entity_ids: &mut state.entity_ids,
             camera: &mut state.camera,
             renderer: &mut state.renderer,
             background: &mut state.background,
             mode: &mut state.mode,
             text: &mut state.text,
         };
+        
+        if !self.initialized {
+            self.game.startup(&mut ctx);
+            self.initialized = true;
+        }
         self.game.game_loop(&mut ctx, event);
     }
 
@@ -299,7 +309,6 @@ pub trait GameLoop {
     fn startup (
         &mut self,
         ctx: &mut EngineContext,
-        event: WindowEvent,
     ) {
 
     }
