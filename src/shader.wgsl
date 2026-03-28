@@ -20,6 +20,7 @@ struct InstanceInput {
     @location(6) model_matrix_1: vec4<f32>,
     @location(7) model_matrix_2: vec4<f32>,
     @location(8) model_matrix_3: vec4<f32>,
+    @location(9) vertex_offset: vec3<f32>
 };
 
 
@@ -36,7 +37,8 @@ fn vs_main(
     );
     var out: VertexOutput;
     out.tex_coords = model.tex_coords;
-    out.clip_position = camera.view_proj * model_matrix * vec4<f32>(model.position, 1.0);
+    let pos = vec4<f32>(model.position + instance.vertex_offset, 1.0);
+    out.clip_position = camera.view_proj * model_matrix * pos;
     return out;
 }
 

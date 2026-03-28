@@ -92,12 +92,15 @@ pub const INDICES: &[u16] = &[
 struct Instance {
     position: cgmath::Vector3<f32>,
     rotation: cgmath::Quaternion<f32>,
+    vertex_offset: cgmath::Vector3<f32>
 }
 
 impl Instance {
     fn to_raw(&self) -> InstanceRaw {
         InstanceRaw {
             model: (cgmath::Matrix4::from_translation(self.position) * cgmath::Matrix4::from(self.rotation)).into(),
+            vertex_offset: self.vertex_offset.into(),
+            _padding: 0.0
         }
     }
 }
@@ -107,6 +110,8 @@ impl Instance {
 #[derive(Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
 struct InstanceRaw {
     model: [[f32; 4]; 4],
+    vertex_offset: [f32; 3],
+    _padding: f32
 }
 
 impl InstanceRaw {
@@ -143,6 +148,11 @@ impl InstanceRaw {
                     shader_location: 8,
                     format: wgpu::VertexFormat::Float32x4,
                 },
+                wgpu::VertexAttribute {
+                    offset: mem::size_of::<[f32; 16]>() as wgpu::BufferAddress,
+                    shader_location: 9,
+                    format: wgpu::VertexFormat::Float32x3,
+                }
             ],
         }
     }

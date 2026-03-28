@@ -128,11 +128,11 @@ impl State {
                 entries: &[
                     wgpu::BindGroupEntry {
                         binding: 0,
-                        resource: wgpu::BindingResource::TextureView(&diffuse_texture.view), // CHANGED!
+                        resource: wgpu::BindingResource::TextureView(&diffuse_texture.view), 
                     },
                     wgpu::BindGroupEntry {
                         binding: 1,
-                        resource: wgpu::BindingResource::Sampler(&diffuse_texture.sampler), // CHANGED!
+                        resource: wgpu::BindingResource::Sampler(&diffuse_texture.sampler), 
                     }
                 ],
                 label: Some("diffuse_bind_group"),
@@ -292,7 +292,7 @@ impl State {
                 };
 
                 Instance {
-                    position, rotation,
+                    position, rotation, vertex_offset: Vector3 { x: 0.0, y: 0.0, z: 0.0 }
                 }
             })
         }).collect::<Vec<_>>();
@@ -425,20 +425,12 @@ impl State {
 
             // render()
             render_pass.set_pipeline(&self.render_pipeline);
-            render_pass.set_bind_group(0, &self.diffuse_bind_group, &[]); 
-            render_pass.set_bind_group(1, &self.camera_bind_group, &[]);
-            // render_pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
-            // render_pass.set_vertex_buffer(1, self.instance_buffer.slice(..));
-            // render_pass.set_index_buffer(self.index_buffer.slice(..), wgpu::IndexFormat::Uint16);
-            // render_pass.draw_indexed(0..self.num_indices, 0, 0..self.instances.len() as _);
-
-            
+            render_pass.set_bind_group(0, &self.diffuse_bind_group, &[]); // index = group in shader.wgsl 
+            render_pass.set_bind_group(1, &self.camera_bind_group, &[]); // index = group in shader.wgsl
 
             self.renderer.entity_vertex_data.clear();
             self.text.clear();
 
-            println!("entity id length: {}", self.entity_ids.len());
-            println!("entity length: {}", self.entities.len());
             for id in &self.entity_ids {
                 let entity = match self.entities.get(id) {
                     Some(e) => e,

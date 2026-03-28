@@ -6,7 +6,7 @@ use game_engine_rs::{
     Mode
 };
 
-use winit::{event::{KeyEvent, WindowEvent}, keyboard::{KeyCode, PhysicalKey}};
+use winit::{event::{WindowEvent}, keyboard::{KeyCode, PhysicalKey}};
 
 
 
@@ -34,7 +34,7 @@ impl GameLoop for MyGame {
         // let width = 0.5;
         // let height = 0.5;
         // ctx.draw_rectangle(Point2D {x: -0.5, y: 0.5}, width, height);
-        ctx.draw_circle(1, position: Point2D);
+        let _ = ctx.draw_circle(1, Point2D::default());
         ctx.clear_background(Color { r: 255.0, g: 255.0, b: 255.0, a: 255.0 });
         match event {
             WindowEvent::KeyboardInput { device_id: _, event, is_synthetic: _ } => {
@@ -57,6 +57,7 @@ impl GameLoop for MyGame {
             },
             _ => {}
         }
+        ctx.set_location(1, cgmath::Vector3 { x: self.ball_pos.x, y: self.ball_pos.y, z: 0.0 });
         ctx.set_camera_eye(self.camera_eye);
         ctx.set_camera_target(self.camera_target);
     }

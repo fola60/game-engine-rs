@@ -1,7 +1,7 @@
 use wgpu::util::DeviceExt;
 use cgmath::{InnerSpace, Rotation3, Vector3, Zero};
 use crate::{
-    Instance, renderer::VertexIndicie, texture::Texture
+    Instance, Vertex, renderer::VertexIndicie, texture::Texture
 };
 
 pub struct Entity {
@@ -11,7 +11,7 @@ pub struct Entity {
     pub(crate) instance_displacement: cgmath::Vector3<f32>,
     pub(crate) diffuse_bind_group: Option<wgpu::BindGroup>,
     pub(crate) diffuse_texture: Option<Texture>,
-    pub(crate) position: Vector3<f32>
+    pub(crate) location: [f32;3]
 }
 
 impl Entity {
@@ -37,8 +37,9 @@ impl Entity {
         index_buffer
     }
 
-    pub(crate) fn get_instance_buffer(&self, device: &mut wgpu::Device) -> wgpu::Buffer {
 
+    pub(crate) fn get_instance_buffer(&self, device: &mut wgpu::Device) -> wgpu::Buffer {
+        let location = self.location;
         let instances = (0..self.num_instances).flat_map(|z| {
             (0..self.num_instances).map(move |x| {
                 let position = cgmath::Vector3 { x: x as f32, y: 0.0, z: z as f32 } - &self.instance_displacement;
@@ -52,7 +53,7 @@ impl Entity {
                 };
 
                 Instance {
-                    position, rotation,
+                    position, rotation, vertex_offset: location.into()
                 }
             })
         }).collect::<Vec<_>>();
@@ -72,6 +73,6 @@ impl Entity {
 
     pub(crate) fn new(id: u32, vertex_data: VertexIndicie, num_instances_per_row: u32, instance_displacement: cgmath::Vector3<f32>) -> Entity {
          
-        Entity {id, vertex_data, num_instances: num_instances_per_row, instance_displacement, diffuse_bind_group: None, diffuse_texture: None, position: Vector3 { x: 0.0, y: 0.0, z: 0.0 }}
+        Entity {id, vertex_data, num_instances: num_instances_per_row, instance_displacement, diffuse_bind_group: None, diffuse_texture: None, location: [0.0, 0.0, 0.0]}
     }
 }

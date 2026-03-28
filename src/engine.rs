@@ -145,6 +145,23 @@ impl<'a> EngineContext<'a> {
     pub fn draw_text(&mut self, location: Point2D, text: &str, font_size: u8) {
         self.text.push((String::from(text), location.x, location.y, font_size));
     }
+
+    pub fn get_location(&mut self, id: u32) -> Option<Vector3<f32>> {
+        if let Some(entity) = self.entities.get(&id) {
+            Some(entity.location.into())
+        } else {
+            None
+        }
+    }
+
+    pub fn set_location(&mut self, id: u32, location: Vector3<f32>) -> bool {
+        if let Some(entity) = self.entities.get_mut(&id) {
+            entity.location = [location.x, location.y, location.z];
+            true
+        } else {
+            false
+        }
+    }
 }
 
 
