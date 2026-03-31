@@ -7,7 +7,7 @@ pub mod texture;
 pub mod camera;
 pub mod renderer;
 pub mod entity;
-
+pub mod engine_context;
 // Draw a 2d circle 
 
 
@@ -28,18 +28,35 @@ impl Default for Point2D {
     }
 }
 
-pub struct Color {
-    pub r: f64,
-    pub g: f64,
-    pub b: f64,
-    pub a: f64
+pub enum Color {
+    Red,
+    Green,
+    Blue,
+    White,
+    Black,
+    Yellow,
+    Cyan,
+    Magenta,
+    Custom(f32, f32, f32, f32),
 }
 
-impl Default for Color {
-    fn default() -> Self {
-        Color { r: 0.0, g: 0.0, b: 0.0, a: 0.0 }
+impl Color {
+    pub fn to_rgba(&self) -> [f32; 4] {
+        match self {
+            Color::Red     => [1.0, 0.0, 0.0, 1.0],
+            Color::Green   => [0.0, 1.0, 0.0, 1.0],
+            Color::Blue    => [0.0, 0.0, 1.0, 1.0],
+            Color::White   => [1.0, 1.0, 1.0, 1.0],
+            Color::Black   => [0.0, 0.0, 0.0, 1.0],
+            Color::Yellow  => [1.0, 1.0, 0.0, 1.0],
+            Color::Cyan    => [0.0, 1.0, 1.0, 1.0],
+            Color::Magenta => [1.0, 0.0, 1.0, 1.0],
+            Color::Custom(r, g, b, a) => [*r, *g, *b, *a],
+        }
     }
 }
+
+
 // lib.rs
 #[repr(C)]
 #[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
@@ -92,13 +109,15 @@ pub const INDICES: &[u16] = &[
 struct Instance {
     position: cgmath::Vector3<f32>,
     rotation: cgmath::Quaternion<f32>,
-    vertex_offset: cgmath::Vector3<f32>
+    vertex_offset: cgmath::Vector3<f32>,
+    color: cgmath::Vector4<f32>
 }
 
 impl Instance {
     fn to_raw(&self) -> InstanceRaw {
         InstanceRaw {
             model: (cgmath::Matrix4::from_translation(self.position) * cgmath::Matrix4::from(self.rotation)).into(),
+            color: self.color.into(),
             vertex_offset: self.vertex_offset.into(),
             _padding: 0.0
         }
@@ -110,6 +129,7 @@ impl Instance {
 #[derive(Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
 struct InstanceRaw {
     model: [[f32; 4]; 4],
+    color: [f32; 4],
     vertex_offset: [f32; 3],
     _padding: f32
 }
@@ -151,6 +171,11 @@ impl InstanceRaw {
                 wgpu::VertexAttribute {
                     offset: mem::size_of::<[f32; 16]>() as wgpu::BufferAddress,
                     shader_location: 9,
+                    format: wgpu::VertexFormat::Float32x4,
+                },
+                wgpu::VertexAttribute {
+                    offset: mem::size_of::<[f32; 20]>() as wgpu::BufferAddress,
+                    shader_location: 10,
                     format: wgpu::VertexFormat::Float32x3,
                 }
             ],

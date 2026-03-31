@@ -13,6 +13,7 @@ struct VertexInput {
 struct VertexOutput {
     @builtin(position) clip_position: vec4<f32>,
     @location(0) tex_coords: vec2<f32>,
+    @location(1) color: vec4<f32>,
 }
 
 struct InstanceInput {
@@ -20,9 +21,9 @@ struct InstanceInput {
     @location(6) model_matrix_1: vec4<f32>,
     @location(7) model_matrix_2: vec4<f32>,
     @location(8) model_matrix_3: vec4<f32>,
-    @location(9) vertex_offset: vec3<f32>
+    @location(9) color: vec4<f32>,
+    @location(10) vertex_offset: vec3<f32>,
 };
-
 
 @vertex
 fn vs_main(
@@ -39,6 +40,7 @@ fn vs_main(
     out.tex_coords = model.tex_coords;
     let pos = vec4<f32>(model.position + instance.vertex_offset, 1.0);
     out.clip_position = camera.view_proj * model_matrix * pos;
+    out.color = instance.color;
     return out;
 }
 
@@ -51,8 +53,9 @@ var t_diffuse: texture_2d<f32>;
 @group(0) @binding(1)
 var s_diffuse: sampler;
 
+
 @fragment
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
-    return textureSample(t_diffuse, s_diffuse, in.tex_coords);
+    return textureSample(t_diffuse, s_diffuse, in.tex_coords) * in.color;
 }
 

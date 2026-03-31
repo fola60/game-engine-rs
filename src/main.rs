@@ -2,7 +2,8 @@ use cgmath::Point3;
 use game_engine_rs::{
     Color, 
     Point2D, 
-    engine::{Engine, EngineContext, GameLoop}, 
+    engine::{Engine, GameLoop}, 
+    engine_context::EngineContext,
     Mode
 };
 
@@ -13,7 +14,8 @@ use winit::{event::{WindowEvent}, keyboard::{KeyCode, PhysicalKey}};
 struct MyGame {
     camera_eye: Point3<f32>,
     camera_target: Point3<f32>,
-    ball_pos: Point2D
+    ball_pos: Point2D,
+    rectangle_id: u32
 }
 
 impl GameLoop for MyGame {
@@ -22,7 +24,9 @@ impl GameLoop for MyGame {
         &mut self,
         ctx: &mut EngineContext,
     ) {
-        ctx.add_circle(1, self.ball_pos.clone(), 0.5);
+        ctx.add_circle(1, 0.5);
+        ctx.add_rectangle(self.rectangle_id, 2.0, 1.0);
+        ctx.set_target_fps(160);
     }
 
     fn game_loop(
@@ -34,8 +38,9 @@ impl GameLoop for MyGame {
         // let width = 0.5;
         // let height = 0.5;
         // ctx.draw_rectangle(Point2D {x: -0.5, y: 0.5}, width, height);
-        let _ = ctx.draw_circle(1, Point2D::default());
-        ctx.clear_background(Color { r: 255.0, g: 255.0, b: 255.0, a: 255.0 });
+        ctx.clear_background(Color::White);
+        let _ = ctx.draw_circle(1, self.ball_pos.clone(), Color::Black);
+        let _ = ctx.draw_rectangle(self.rectangle_id, Point2D { x: 2.0, y: 2.0 }, Color::Yellow);
         match event {
             WindowEvent::KeyboardInput { device_id: _, event, is_synthetic: _ } => {
                 match event.physical_key {
@@ -57,15 +62,15 @@ impl GameLoop for MyGame {
             },
             _ => {}
         }
-        ctx.set_location(1, cgmath::Vector3 { x: self.ball_pos.x, y: self.ball_pos.y, z: 0.0 });
+        // ctx.set_location(1, cgmath::Vector3 { x: self.ball_pos.x, y: self.ball_pos.y, z: 0.0 });
         ctx.set_camera_eye(self.camera_eye);
         ctx.set_camera_target(self.camera_target);
     }
 }
 
 fn main() -> anyhow::Result<()> {
-    let my_game = MyGame {camera_eye: Point3 { x: 0.0, y: -0.5, z: -5.0 }, camera_target: Point3 { x: 0.5, y: 0.5, z: 0.0 }, ball_pos: Point2D::default()};
-    let app = Engine::init(my_game, 700, 600, "Game engine");
+    let my_game = MyGame {camera_eye: Point3 { x: 0.0, y: -0.5, z: -5.0 }, camera_target: Point3 { x: 0.5, y: 0.5, z: 0.0 }, ball_pos: Point2D::default(), rectangle_id: 0};
+    let app = Engine::init(my_game, 2700, 1600, "Game engine");
     app.run()
 
 }

@@ -1,7 +1,7 @@
 use std::{collections::{HashMap, HashSet}, sync::Arc};
 use winit::{dpi::PhysicalPosition, event::PointerSource, event_loop::ActiveEventLoop, keyboard::KeyCode, window::Window};
 use wgpu::util::DeviceExt;
-use cgmath::{InnerSpace, Rotation3, Vector3, Zero, prelude};
+use cgmath::{InnerSpace, RelativeEq, Rotation3, Vector3, Zero, prelude};
 use crate::{
     Color, INDICES, Instance, InstanceRaw, Mode, Point2D, VERTICES, Vertex, camera::{Camera, CameraController, CameraUniform}, entity::{self, Entity}, renderer::{EntityType, Renderer}, texture::Texture
 };
@@ -36,7 +36,7 @@ pub struct State {
     pub mode: Mode,
     pub text: Vec<(String, f32, f32, u8)>,
     pub entities: HashMap<u32, Entity>,
-    pub entity_ids: HashSet<u32>
+    pub entity_ids: HashSet<u32>,
 }
 
 
@@ -93,8 +93,9 @@ impl State {
         };
 
 
-        let diffuse_bytes = include_bytes!("../assets/happy-tree.png");
-        let diffuse_texture = Texture::from_bytes(&device, &queue, diffuse_bytes, "../assets/happy-tree.png").unwrap();
+        // let diffuse_bytes = include_bytes!("../assets/happy-tree.png");
+        // let diffuse_texture = Texture::from_bytes(&device, &queue, diffuse_bytes, "../assets/happy-tree.png").unwrap();
+        let diffuse_texture = Texture::default(&device, &queue).unwrap();
 
 
 
@@ -138,9 +139,6 @@ impl State {
                 label: Some("diffuse_bind_group"),
             }
         );
-
-
-
 
 
         surface.configure(&device, &config);
@@ -206,6 +204,8 @@ impl State {
         });
 
         let camera_controller = CameraController::new(Point2D { x: 0.0, y: 0.0 });
+
+        
 
         let render_pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: Some("Render Pipeline Layout"),
@@ -292,7 +292,7 @@ impl State {
                 };
 
                 Instance {
-                    position, rotation, vertex_offset: Vector3 { x: 0.0, y: 0.0, z: 0.0 }
+                    position, rotation, vertex_offset: Vector3 { x: 0.0, y: 0.0, z: 0.0 }, color: cgmath::Vector4 { x: 0.0, y: 0.0, z: 0.0, w: 0.0 }
                 }
             })
         }).collect::<Vec<_>>();
@@ -332,11 +332,11 @@ impl State {
             instances,
             instance_buffer,
             renderer: Renderer { entity_vertex_data: vec![], screen_width, screen_height},
-            background: Color::default(),
+            background: Color::White,
             mode: Mode::MODE2D,
             text: vec![],
             entities: HashMap::new(),
-            entity_ids: HashSet::new()
+            entity_ids: HashSet::new(),
         })
 
     }
@@ -402,6 +402,7 @@ impl State {
         });
 
         {
+            let color = self.background.to_rgba();
             let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: Some("Render Pass"),
                 color_attachments: &[Some(wgpu::RenderPassColorAttachment {
@@ -410,10 +411,10 @@ impl State {
                     depth_slice: None,
                     ops: wgpu::Operations {
                         load: wgpu::LoadOp::Clear(wgpu::Color {
-                            r: self.background.r,
-                            g: self.background.g,
-                            b: self.background.b,
-                            a: self.background.a,
+                            r: color[0] as f64,
+                            g: color[1] as f64,
+                            b: color[2] as f64,
+                            a: color[3] as f64,
                         }),
                         store: wgpu::StoreOp::Store,
                     },
@@ -427,18 +428,15 @@ impl State {
             render_pass.set_pipeline(&self.render_pipeline);
             render_pass.set_bind_group(0, &self.diffuse_bind_group, &[]); // index = group in shader.wgsl 
             render_pass.set_bind_group(1, &self.camera_bind_group, &[]); // index = group in shader.wgsl
-
-            self.renderer.entity_vertex_data.clear();
-            self.text.clear();
-
+            
             for id in &self.entity_ids {
                 let entity = match self.entities.get(id) {
                     Some(e) => e,
                     None => continue,
                 };
-
-                render_pass.set_pipeline(&self.render_pipeline);
-                render_pass.set_bind_group(1, &self.camera_bind_group, &[]);
+                
+                // recreating buffers every frame, fix later by adding a bffer attribute to entities
+                // entity.set_diffuse(&mut self.queue, &mut self.device);
                 render_pass.set_vertex_buffer(0, entity.get_vertex_buffer(&mut self.device).slice(..));
                 render_pass.set_vertex_buffer(1, entity.get_instance_buffer(&mut self.device).slice(..));
                 render_pass.set_index_buffer(entity.get_index_buffer(&mut self.device).slice(..), wgpu::IndexFormat::Uint16);
