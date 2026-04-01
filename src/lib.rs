@@ -10,7 +10,7 @@ pub mod entity;
 pub mod engine_context;
 // Draw a 2d circle 
 
-
+const Z: f32 = 0.0;
 pub struct Point2D {
     pub x: f32,
     pub y: f32
@@ -189,7 +189,7 @@ struct Size {
 }
 
 pub enum Mode {
-    MODE2D,
+    Mode2D,
     Mode3D
 }
 

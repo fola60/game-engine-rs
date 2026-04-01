@@ -1,9 +1,6 @@
 use std::collections::{HashMap, HashSet};
 use crate::{
-    camera::Camera,
-    renderer::{EntityType, VertexIndicie},
-    Color, Mode, Vertex, Point2D,
-    entity::Entity
+    Color, Mode, Point2D, Vertex, Z, camera::Camera, entity::Entity, renderer::{EntityType, VertexIndicie}
 };
 use cgmath::{Point3, Vector3};
 
@@ -26,8 +23,8 @@ impl<'a> EngineContext<'a> {
         *self.background = color;      
     }
 
-    pub fn draw_circle(&mut self, id: u32, position: Point2D, color: Color) -> bool {
-        self.set_location(id, Vector3 { x: position.x, y: position.y, z: 0.0 });
+    pub fn draw_circle(&mut self, id: u32, position: &Point2D, color: Color) -> bool {
+        self.set_location(id, Vector3 { x: position.x, y: position.y, z: Z });
         self.set_color(id, color);
         self.entity_ids.insert(id)
     }
@@ -41,7 +38,7 @@ impl<'a> EngineContext<'a> {
 
         // center vertex
         vertices.push(Vertex {
-            position: [0.0, 0.0, 0.0],
+            position: [0.0, 0.0, Z],
             tex_coords: [0.5, 0.5],
         });
 
@@ -52,7 +49,7 @@ impl<'a> EngineContext<'a> {
             let y = radius * angle.sin();
 
             vertices.push(Vertex {
-                position: [x, y, 0.0],
+                position: [x, y, Z],
                 tex_coords: [0.0, 0.0],
             });
         }
@@ -71,7 +68,7 @@ impl<'a> EngineContext<'a> {
         };
 
 
-        self.entities.insert(id, Entity::new(id, data, 1, Vector3 {x: 0.0, y: 0.0, z: 0.0}));
+        self.entities.insert(id, Entity::new(id, data, 1, Vector3 {x: 0.0, y: 0.0, z: Z}));
     }
 
 
@@ -104,31 +101,30 @@ impl<'a> EngineContext<'a> {
         self.camera.target
     }
 
-    pub fn draw_rectangle(&mut self, id: u32, location: Point2D, color: Color) -> bool {
-        self.set_location(id, Vector3 { x: location.x, y: location.y, z: 0.0 });
+    pub fn draw_rectangle(&mut self, id: u32, location: &Point2D, color: Color) -> bool {
+        self.set_location(id, Vector3 { x: location.x, y: location.y, z: Z });
         self.set_color(id, color);
         self.entity_ids.insert(id)
     }
 
     pub fn add_rectangle(&mut self, id: u32, width: f32, height: f32) {
-        let z = 0.0;
         let top_left = Vertex { 
-            position: [0.0, 0.0, z], 
+            position: [0.0, 0.0, Z], 
             tex_coords: [0.0, 1.0]
         };
 
         let top_right = Vertex { 
-            position: [width, 0.0, z], 
+            position: [width, 0.0, Z], 
             tex_coords: [1.0, 1.0]
         };
 
         let bottom_left = Vertex { 
-            position: [0.0, 0.0 - height, z], 
+            position: [0.0, 0.0 - height, Z], 
             tex_coords: [0.0, 0.0]
         };
 
         let bottom_right = Vertex { 
-            position: [width, 0.0 - height, z], 
+            position: [width, 0.0 - height, Z], 
             tex_coords: [1.0, 0.0]
         };
 
@@ -137,7 +133,7 @@ impl<'a> EngineContext<'a> {
         };
 
         
-        self.entities.insert(id, Entity::new(id, entity_vertex_data, 1, Vector3 {x: 0.0, y: 0.0, z: 0.0}));
+        self.entities.insert(id, Entity::new(id, entity_vertex_data, 1, Vector3 {x: 0.0, y: 0.0, z: Z}));
     }
 
     // draws text, relative to the camera position, (0.0, 0.0) is top right

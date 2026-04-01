@@ -24,9 +24,10 @@ impl GameLoop for MyGame {
         &mut self,
         ctx: &mut EngineContext,
     ) {
-        ctx.add_circle(1, 0.5);
-        ctx.add_rectangle(self.rectangle_id, 2.0, 1.0);
+        ctx.add_circle(1, 50.5);
+        ctx.add_rectangle(self.rectangle_id, 20.0, 10.0);
         ctx.set_target_fps(160);
+        ctx.set_mode(Mode::Mode3D);
     }
 
     fn game_loop(
@@ -34,26 +35,27 @@ impl GameLoop for MyGame {
         ctx: &mut EngineContext,
         event: WindowEvent,
     ) {
-        ctx.set_mode(Mode::MODE2D);
         // let width = 0.5;
         // let height = 0.5;
         // ctx.draw_rectangle(Point2D {x: -0.5, y: 0.5}, width, height);
         ctx.clear_background(Color::White);
-        let _ = ctx.draw_circle(1, self.ball_pos.clone(), Color::Black);
-        let _ = ctx.draw_rectangle(self.rectangle_id, Point2D { x: 2.0, y: 2.0 }, Color::Yellow);
+        let _ = ctx.draw_circle(1, &self.ball_pos, Color::Black);
+        let _ = ctx.draw_rectangle(self.rectangle_id, &Point2D { x: 200.0, y: 200.0 }, Color::Yellow);
         match event {
             WindowEvent::KeyboardInput { device_id: _, event, is_synthetic: _ } => {
                 match event.physical_key {
                     PhysicalKey::Code(code) => {
                         match code {
-                            KeyCode::ArrowLeft => { self.ball_pos.x -= 0.1 },
-                            KeyCode::ArrowRight => { self.ball_pos.x += 0.1 },
-                            KeyCode::ArrowDown => { self.ball_pos.y -= 0.1 },
-                            KeyCode::ArrowUp => { self.ball_pos.y += 0.1 },
+                            KeyCode::ArrowLeft => { self.ball_pos.x -= 5.0 },
+                            KeyCode::ArrowRight => { self.ball_pos.x += 5.0 },
+                            KeyCode::ArrowDown => { self.ball_pos.y -= 5.0 },
+                            KeyCode::ArrowUp => { self.ball_pos.y += 5.0 },
                             KeyCode::KeyA => { self.camera_eye.x -= 0.1 },
                             KeyCode::KeyD => { self.camera_eye.x += 0.1 },
                             KeyCode::KeyS => { self.camera_eye.z -= 0.1 },
                             KeyCode::KeyW => { self.camera_eye.z += 0.1 },
+                            KeyCode::Digit2 => {ctx.set_mode(Mode::Mode2D)},
+                            KeyCode::Digit3 => {ctx.set_mode(Mode::Mode3D)}
                             _ => {}
                         }
                     },
@@ -69,7 +71,7 @@ impl GameLoop for MyGame {
 }
 
 fn main() -> anyhow::Result<()> {
-    let my_game = MyGame {camera_eye: Point3 { x: 0.0, y: -0.5, z: -5.0 }, camera_target: Point3 { x: 0.5, y: 0.5, z: 0.0 }, ball_pos: Point2D::default(), rectangle_id: 0};
+    let my_game = MyGame {camera_eye: Point3 { x: 0.0, y: -5.5, z: -5.0 }, camera_target: Point3 { x: 0.5, y: 0.5, z: 0.0 }, ball_pos: Point2D::default(), rectangle_id: 0};
     let app = Engine::init(my_game, 2700, 1600, "Game engine");
     app.run()
 

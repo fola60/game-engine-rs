@@ -26,8 +26,8 @@ impl CameraController {
     }
 
     pub(crate) fn update_camera(&self, camera: &mut Camera, width: u32, height: u32) {
-        camera.eye = Point3 {x: camera.eye.x + self.offset.x, y: self.eye.y + self.offset.y, z: camera.eye.z};
-        camera.target = Point3 {x: camera.target.x, y: camera.target.y, z: camera.target.z};
+        camera.eye = Point3 {x: self.eye.x + self.offset.x, y: self.eye.y + self.offset.y, z: camera.eye.z};
+        camera.target = Point3 {x: self.target.x, y: self.target.y, z: camera.target.z};
         camera.rotation = self.rotation;
         camera.aspect = width as f32 / height as f32;
     }
@@ -82,15 +82,29 @@ impl CameraUniform {
     }
 }
 
+pub enum Projection {
+    Perspective {
+        fovy: f32,
+        znear: f32,
+        zfar: f32,
+    },
+    Orthographic {
+        left: f32,
+        right: f32,
+        bottom: f32,
+        top: f32,
+        znear: f32,
+        zfar: f32,
+    },
+}
+
 pub struct Camera {
     pub(crate) eye: cgmath::Point3<f32>,
     pub(crate) target: cgmath::Point3<f32>,
     pub(crate) up: cgmath::Vector3<f32>,
     pub(crate) aspect: f32,
-    pub(crate) fovy: f32,
-    pub(crate) znear: f32,
-    pub(crate) zfar: f32,
-    pub(crate) rotation: f32
+    pub(crate) rotation: f32,
+    pub(crate) projection: Projection,
 }
 
 
@@ -105,25 +119,50 @@ pub const OPENGL_TO_WGPU_MATRIX: cgmath::Matrix4<f32> = cgmath::Matrix4::from_co
 
 impl Camera {
     pub(crate) fn build_view_projection_matrix(&self) -> cgmath::Matrix4<f32> {
-        // 1.
         let view = cgmath::Matrix4::look_at_rh(self.eye, self.target, self.up);
-        // 2.
-        let proj = cgmath::perspective(cgmath::Deg(self.fovy), self.aspect, self.znear, self.zfar);
 
-        // 3.
-        return OPENGL_TO_WGPU_MATRIX * proj * view;
+        let proj = match self.projection {
+            Projection::Perspective { fovy, znear, zfar } => {
+                cgmath::perspective(cgmath::Deg(fovy), self.aspect, znear, zfar)
+            }
+            Projection::Orthographic { left, right, bottom, top, znear, zfar } => {
+                cgmath::ortho(left, right, bottom, top, znear, zfar)
+            }
+        };
+
+        OPENGL_TO_WGPU_MATRIX * proj * view
     }
 
     pub(crate) fn get_2d_camera(width: f32, height: f32) -> Self {
-        Camera { 
-            eye: cgmath::Point3 { x: 0.0, y: 0.0, z: 1.0 },  
-            target: cgmath::Point3 { x: 0.0, y: 0.0, z: 0.0 }, 
-            up: cgmath::Vector3 { x: 0.0, y: 1.0, z: 0.0 }, 
-            aspect: width / height, 
-            fovy: 1.0, // 
-            znear: 0.1, 
-            zfar: 10.0, 
+        Camera {
+            eye: cgmath::Point3 { x: 0.0, y: 0.0, z: 1.0 },
+            target: cgmath::Point3 { x: 0.0, y: 0.0, z: 0.0 },
+            up: cgmath::Vector3 { x: 0.0, y: 1.0, z: 0.0 },
+            aspect: width / height,
             rotation: 0.0,
+            projection: Projection::Orthographic {
+                left: 0.0,
+                right: width,
+                bottom: height,
+                top: 0.0,
+                znear: -1.0,
+                zfar: 1.0,
+            },
+        }
     }
-}
+
+    pub(crate) fn get_3d_camera(width: f32, height: f32) -> Self {
+        Camera {
+            eye: cgmath::Point3 { x: 0.0, y: 0.0, z: 5.0 },
+            target: cgmath::Point3 { x: 0.0, y: 0.0, z: 0.0 },
+            up: cgmath::Vector3 { x: 0.0, y: 1.0, z: 0.0 },
+            aspect: width / height,
+            rotation: 0.0,
+            projection: Projection::Perspective {
+                fovy: 45.0,
+                znear: 0.1,
+                zfar: 100.0,
+            },
+        }
+    }
 }

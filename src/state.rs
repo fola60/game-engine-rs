@@ -148,22 +148,9 @@ impl State {
             source: wgpu::ShaderSource::Wgsl(include_str!("shader.wgsl").into()),
         });
 
-        let camera = Camera {
-            // position the camera 1 unit up and 2 units back
-            // +z is out of the screen
-            eye: (0.0, 1.0, -2.0).into(),
-            // have it look at the origin
-            target: (0.0, 0.0, -1.0).into(),
-            // which way is "up"
-            up: cgmath::Vector3::unit_y(),
-            aspect: config.width as f32 / config.height as f32,
-            fovy: 45.0,
-            znear: 0.1,
-            zfar: 100.0,
-            rotation: 0.0
-        };
+        let camera = Camera::get_3d_camera(config.width as f32, config.height as f32);
 
-        // in new() after creating `camera`
+
 
         let mut camera_uniform = CameraUniform::new();
         camera_uniform.update_view_proj(&camera);
@@ -333,7 +320,7 @@ impl State {
             instance_buffer,
             renderer: Renderer { entity_vertex_data: vec![], screen_width, screen_height},
             background: Color::White,
-            mode: Mode::MODE2D,
+            mode: Mode::Mode2D,
             text: vec![],
             entities: HashMap::new(),
             entity_ids: HashSet::new(),
@@ -370,14 +357,14 @@ impl State {
     pub fn update(&mut self) {
         self.camera_controller.update_camera(&mut self.camera, self.config.width, self.config.height);
         match self.mode {
-            Mode::MODE2D => {
-                self.camera_uniform.update_view_proj(&Camera::get_2d_camera(self.config.width as f32, self.config.height as f32))
+            Mode::Mode2D => {
+                let cam2d = Camera::get_2d_camera(self.config.width as f32, self.config.height as f32);
+                self.camera_uniform.update_view_proj(&cam2d);
             },
             Mode::Mode3D => {
-                self.camera_uniform.update_view_proj(&self.camera)
+                self.camera_uniform.update_view_proj(&self.camera);
             }
         }
-        self.camera_uniform.update_view_proj(&self.camera);
         self.queue.write_buffer(&self.camera_buffer, 0, bytemuck::cast_slice(&[self.camera_uniform]));
     }
 
