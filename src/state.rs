@@ -3,7 +3,12 @@ use winit::{dpi::PhysicalPosition, event::PointerSource, event_loop::ActiveEvent
 use wgpu::util::DeviceExt;
 use cgmath::{InnerSpace, RelativeEq, Rotation3, Vector3, Zero, prelude};
 use crate::{
-    Color, INDICES, Instance, InstanceRaw, Mode, Point2D, VERTICES, Vertex, camera::{Camera, CameraController, CameraUniform}, entity::{self, Entity}, renderer::{EntityType, Renderer}, texture::Texture
+    camera::{Camera, CameraController, CameraUniform},
+    entity::{self, Entity},
+    model::{DrawModel, ModelVertex, Vertex},
+    renderer::{EntityType, Renderer},
+    texture::Texture,
+    Color, Instance, InstanceRaw, Mode, Point2D,
 };
 
 
@@ -18,9 +23,6 @@ pub struct State {
     pub is_surface_configured: bool,
     pub render_pipeline: wgpu::RenderPipeline,
     pub window: Arc<dyn Window>,
-    pub vertex_buffer: wgpu::Buffer,
-    pub index_buffer: wgpu::Buffer,
-    pub num_indices: u32,
     pub diffuse_bind_group: wgpu::BindGroup,
     pub diffuse_texture: Texture,
     pub camera: Camera,
@@ -28,6 +30,7 @@ pub struct State {
     pub camera_buffer: wgpu::Buffer,
     pub camera_bind_group: wgpu::BindGroup,
     pub camera_controller: CameraController,
+    pub texture_bind_group_layout: wgpu::BindGroupLayout,
     pub swap: bool,
     pub instances: Vec<Instance>,
     pub instance_buffer: wgpu::Buffer,
@@ -43,7 +46,6 @@ pub struct State {
 impl State {
     pub async fn new(window: Arc<dyn Window>) -> anyhow::Result<State> {
         let size = window.surface_size();
-        let num_indices = INDICES.len() as u32;
         // The instance is a handle to our GPU
         // BackendBit::PRIMARY => Vulkan + Metal + DX12 + Browser WebGPU
         let instance = wgpu::Instance::new(&wgpu::InstanceDescriptor {
@@ -209,7 +211,7 @@ impl State {
             vertex: wgpu::VertexState {
                 module: &shader,
                 entry_point: Some("vs_main"), // 1.
-                buffers: &[Vertex::desc(), InstanceRaw::desc()], // 2.
+                buffers: &[ModelVertex::desc(), InstanceRaw::desc()], // 2.
                 compilation_options: wgpu::PipelineCompilationOptions::default(),
             },
             fragment: Some(wgpu::FragmentState { // 3.
@@ -243,25 +245,6 @@ impl State {
             multiview: None, // 5.
             cache: None, // 6.
         });
-
-
-        // new()
-        let vertex_buffer = device.create_buffer_init(
-            &wgpu::util::BufferInitDescriptor {
-                label: Some("Vertex Buffer"),
-                contents: bytemuck::cast_slice(VERTICES),
-                usage: wgpu::BufferUsages::VERTEX,
-            }
-        );
-
-        let index_buffer = device.create_buffer_init(
-        &wgpu::util::BufferInitDescriptor {
-            label: Some("Index Buffer"),
-            contents: bytemuck::cast_slice(INDICES),
-            usage: wgpu::BufferUsages::INDEX,
-            }
-        );
-
         const NUM_INSTANCES_PER_ROW: u32 = 10;
         const INSTANCE_DISPLACEMENT: cgmath::Vector3<f32> = cgmath::Vector3::new(NUM_INSTANCES_PER_ROW as f32 * 0.5, 0.0, NUM_INSTANCES_PER_ROW as f32 * 0.5);
 
@@ -305,9 +288,6 @@ impl State {
             is_surface_configured: true,
             render_pipeline,
             window,
-            vertex_buffer,
-            index_buffer,
-            num_indices,
             diffuse_bind_group,
             diffuse_texture,
             camera,
@@ -315,6 +295,7 @@ impl State {
             camera_buffer,
             camera_bind_group,
             camera_controller,
+            texture_bind_group_layout,
             swap: true,
             instances,
             instance_buffer,
@@ -355,7 +336,6 @@ impl State {
     }
 
     pub fn update(&mut self) {
-        self.camera_controller.update_camera(&mut self.camera, self.config.width, self.config.height);
         match self.mode {
             Mode::Mode2D => {
                 let cam2d = Camera::get_2d_camera(self.config.width as f32, self.config.height as f32);
@@ -421,13 +401,19 @@ impl State {
                     Some(e) => e,
                     None => continue,
                 };
-                
-                // recreating buffers every frame, fix later by adding a bffer attribute to entities
-                // entity.set_diffuse(&mut self.queue, &mut self.device);
-                render_pass.set_vertex_buffer(0, entity.get_vertex_buffer(&mut self.device).slice(..));
-                render_pass.set_vertex_buffer(1, entity.get_instance_buffer(&mut self.device).slice(..));
-                render_pass.set_index_buffer(entity.get_index_buffer(&mut self.device).slice(..), wgpu::IndexFormat::Uint16);
-                render_pass.draw_indexed(0..entity.vertex_data.indicies.len() as u32, 0, 0..entity.num_instances as u32);
+                if let Some(model) = &entity.model {
+                    render_pass.set_vertex_buffer(1, entity.instance_buffer.slice(..));
+                    render_pass.draw_model_instanced(
+                        model,
+                        0..entity.num_instances,
+                        &self.camera_bind_group,
+                    );
+                } else {
+                    render_pass.set_vertex_buffer(0, entity.vertex_buffer.slice(..));
+                    render_pass.set_vertex_buffer(1, entity.instance_buffer.slice(..));
+                    render_pass.set_index_buffer(entity.index_buffer.slice(..), wgpu::IndexFormat::Uint16);
+                    render_pass.draw_indexed(0..entity.vertex_data.indicies.len() as u32, 0, 0..entity.num_instances as u32);
+                }
             }
 
         }

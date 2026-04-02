@@ -1,21 +1,14 @@
+use crate::{engine_context::EngineContext, state::State};
 use std::{sync::Arc, time::Instant};
-use crate::{
-    state::{State},
-    engine_context::EngineContext
-};
 
 use winit::application::ApplicationHandler;
 use winit::dpi::{PhysicalSize, Size};
 use winit::event::{KeyEvent, WindowEvent};
 use winit::event_loop::{ActiveEventLoop, ControlFlow, EventLoop};
 use winit::keyboard::PhysicalKey;
-use winit::window::{Window, WindowId, WindowAttributes};
+use winit::window::{Window, WindowAttributes, WindowId};
 
-
-
-
-
-pub struct Engine<G: GameLoop + 'static > {
+pub struct Engine<G: GameLoop + 'static> {
     game: G,
     initialized: bool,
     screen_width: u32,
@@ -24,26 +17,25 @@ pub struct Engine<G: GameLoop + 'static > {
     last_frame_time: Option<Instant>,
     pub window: Option<Arc<dyn Window>>,
     pub state: Option<State>,
-    pub fps: u32
+    pub fps: u32,
 }
 
 impl<G: GameLoop> Engine<G> {
     pub fn init(game: G, screen_width: u32, screen_height: u32, title: &str) -> Engine<G> {
-        Self { 
+        Self {
             game,
             initialized: false,
             window: None,
-            screen_width, 
-            screen_height, 
-            title: String::from(title), 
+            screen_width,
+            screen_height,
+            title: String::from(title),
             last_frame_time: None,
-            state: None, 
-            fps: 60
+            state: None,
+            fps: 60,
         }
     }
 
-    
-    pub fn run(self) -> anyhow::Result<()>  {
+    pub fn run(self) -> anyhow::Result<()> {
         let event_loop = EventLoop::new()?;
 
         // Configure settings before launching.
@@ -57,10 +49,6 @@ impl<G: GameLoop> Engine<G> {
 
         Ok(())
     }
-    
-    
-    
-
 }
 
 impl<G: GameLoop> ApplicationHandler for Engine<G> {
@@ -72,17 +60,14 @@ impl<G: GameLoop> ApplicationHandler for Engine<G> {
         }));
         window_attributes.title = self.title.clone();
 
-        let window: Arc<dyn Window> = Arc::from(
-            event_loop.create_window(window_attributes).unwrap()
-        );
+        let window: Arc<dyn Window> =
+            Arc::from(event_loop.create_window(window_attributes).unwrap());
 
-        let state = pollster::block_on(State::new(window.clone()))
-            .expect("Failed to create State");
-        
+        let state = pollster::block_on(State::new(window.clone())).expect("Failed to create State");
+
         self.window = Some(window);
         self.state = Some(state);
         self.last_frame_time = Some(Instant::now());
-        
     }
 
     fn window_event(
@@ -96,8 +81,7 @@ impl<G: GameLoop> ApplicationHandler for Engine<G> {
             Some(canvas) => canvas,
             None => return,
         };
-        
-        
+
         match event {
             WindowEvent::CloseRequested => event_loop.exit(),
             WindowEvent::RedrawRequested => {
@@ -113,26 +97,26 @@ impl<G: GameLoop> ApplicationHandler for Engine<G> {
                         println!("Unable to render {}", e);
                     }
                 }
-            },
+            }
             WindowEvent::KeyboardInput {
                 event:
-                KeyEvent {
-                    physical_key: PhysicalKey::Code(code),
-                    state: key_state,
-                    ..
-                },
+                    KeyEvent {
+                        physical_key: PhysicalKey::Code(code),
+                        state: key_state,
+                        ..
+                    },
                 ..
             } => state.handle_key(event_loop, code, key_state.is_pressed()),
-            WindowEvent::SurfaceResized(size) => { 
-                state.resize(size.width, size.height)
-            }
+            WindowEvent::SurfaceResized(size) => state.resize(size.width, size.height),
             _ => {}
         }
 
         let now = Instant::now();
-        let elapsed = now.duration_since(self.last_frame_time.unwrap()).as_secs_f32();
+        let elapsed = now
+            .duration_since(self.last_frame_time.unwrap())
+            .as_secs_f32();
         let dt = if let Some(last) = self.last_frame_time {
-            now.duration_since(last).as_secs_f32()  // delta time in seconds as f32
+            now.duration_since(last).as_secs_f32() // delta time in seconds as f32
         } else {
             0.0
         };
@@ -145,44 +129,32 @@ impl<G: GameLoop> ApplicationHandler for Engine<G> {
         }
 
         self.last_frame_time = Some(now);
-        
+
         let mut ctx = EngineContext {
             entities: &mut state.entities,
             entity_ids: &mut state.entity_ids,
+            device: &state.device,
+            queue: &state.queue,
+            texture_bind_group_layout: &state.texture_bind_group_layout,
             camera: &mut state.camera,
             background: &mut state.background,
             mode: &mut state.mode,
             text: &mut state.text,
             fps: &mut self.fps,
-            dt: dt
+            dt: dt,
         };
-        
+
         if !self.initialized {
             self.game.startup(&mut ctx);
             self.initialized = true;
         }
 
-
         self.game.game_loop(&mut ctx, event);
     }
-
-
-    
 }
 
 pub trait GameLoop {
-    fn game_loop(
-        &mut self,
-        _ctx: &mut EngineContext,
-        _event: WindowEvent
-    ) {
+    fn game_loop(&mut self, _ctx: &mut EngineContext, _event: WindowEvent) {}
 
-    }
-
-    fn startup (
-        &mut self,
-        _ctx: &mut EngineContext,
-    ) {
-
-    }
+    fn startup(&mut self, _ctx: &mut EngineContext) {}
 }

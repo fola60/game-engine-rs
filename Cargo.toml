@@ -10,6 +10,7 @@ anyhow = "1.0"
 pollster = "0.3"
 bytemuck = { version = "1", features = ["derive"] }
 cgmath = "0.18"
+tobj = "4"
 
 
 [dependencies.image]
