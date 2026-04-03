@@ -2,7 +2,7 @@ use crate::{
     camera::Camera,
     entity::Entity,
     renderer::{EntityType, VertexIndicie},
-    resources, Color, Mode, Point2D, Z,
+    resources, world_units, Color, Mode, Point2D, Z,
 };
 use cgmath::{Point3, Vector3};
 use std::collections::{HashMap, HashSet};
@@ -41,6 +41,7 @@ impl<'a> EngineContext<'a> {
 
     pub fn add_circle(&mut self, id: u32, radius: f32) {
         let segments = 32; // increase for smoother circle
+        let radius = world_units::meters_to_world(radius);
 
         let mut vertices = vec![];
         let mut indices = vec![];
@@ -67,8 +68,8 @@ impl<'a> EngineContext<'a> {
 
         // indices (triangle fan)
         for i in 1..=segments {
-            indices.push(i as u16);
             indices.push(0);
+            indices.push(i as u16);
             indices.push((i + 1) as u16);
         }
 
@@ -137,6 +138,9 @@ impl<'a> EngineContext<'a> {
     }
 
     pub fn add_rectangle(&mut self, id: u32, width: f32, height: f32) {
+        let width = world_units::meters_to_world(width);
+        let height = world_units::meters_to_world(height);
+
         let top_left = crate::model::ModelVertex {
             position: [0.0, 0.0, Z],
             tex_coords: [0.0, 1.0],
@@ -163,7 +167,7 @@ impl<'a> EngineContext<'a> {
 
         let entity_vertex_data = VertexIndicie {
             vertexes: vec![top_left, top_right, bottom_left, bottom_right],
-            indicies: vec![0, 1, 2, 2, 1, 3],
+            indicies: vec![0, 2, 1, 2, 3, 1],
             entity_type: EntityType::Rectangle,
         };
 

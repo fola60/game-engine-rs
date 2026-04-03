@@ -25,6 +25,7 @@ pub struct State {
     pub window: Arc<dyn Window>,
     pub diffuse_bind_group: wgpu::BindGroup,
     pub diffuse_texture: Texture,
+    pub depth_texture: Texture,
     pub camera: Camera,
     pub camera_uniform: CameraUniform,
     pub camera_buffer: wgpu::Buffer,
@@ -228,7 +229,7 @@ impl State {
             topology: wgpu::PrimitiveTopology::TriangleList, // 1.
             strip_index_format: None,
             front_face: wgpu::FrontFace::Ccw, // 2.
-            cull_mode: Some(wgpu::Face::Back),
+            cull_mode: None,
             // Setting this to anything other than Fill requires Features::NON_FILL_POLYGON_MODE
             polygon_mode: wgpu::PolygonMode::Fill,
             // Requires Features::DEPTH_CLIP_CONTROL
@@ -236,7 +237,13 @@ impl State {
             // Requires Features::CONSERVATIVE_RASTERIZATION
             conservative: false,
             },
-            depth_stencil: None, // 1.
+            depth_stencil: Some(wgpu::DepthStencilState {
+                format: Texture::DEPTH_FORMAT,
+                depth_write_enabled: true,
+                depth_compare: wgpu::CompareFunction::Less,
+                stencil: wgpu::StencilState::default(),
+                bias: wgpu::DepthBiasState::default(),
+            }),
             multisample: wgpu::MultisampleState {
                 count: 1, // 2.
                 mask: !0, // 3.
@@ -278,6 +285,7 @@ impl State {
 
         let screen_width = config.width;
         let screen_height = config.height;
+        let depth_texture = Texture::create_depth_texture(&device, &config, "depth_texture");
  
 
         Ok(Self {
@@ -290,6 +298,7 @@ impl State {
             window,
             diffuse_bind_group,
             diffuse_texture,
+            depth_texture,
             camera,
             camera_uniform,
             camera_buffer,
@@ -318,6 +327,7 @@ impl State {
             self.config.width = width;
             self.config.height = height;
             self.surface.configure(&self.device, &self.config);
+            self.depth_texture = Texture::create_depth_texture(&self.device, &self.config, "depth_texture");
             self.is_surface_configured = true;
         }
     }
@@ -386,21 +396,33 @@ impl State {
                         store: wgpu::StoreOp::Store,
                     },
                 })],
-                depth_stencil_attachment: None,
+                depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
+                    view: &self.depth_texture.view,
+                    depth_ops: Some(wgpu::Operations {
+                        load: wgpu::LoadOp::Clear(1.0),
+                        store: wgpu::StoreOp::Store,
+                    }),
+                    stencil_ops: None,
+                }),
                 occlusion_query_set: None,
                 timestamp_writes: None
             });
 
             // render()
             render_pass.set_pipeline(&self.render_pipeline);
-            render_pass.set_bind_group(0, &self.diffuse_bind_group, &[]); // index = group in shader.wgsl 
-            render_pass.set_bind_group(1, &self.camera_bind_group, &[]); // index = group in shader.wgsl
+            // render_pass.set_bind_group(0, &self.diffuse_bind_group, &[]); // index = group in shader.wgsl 
+            // render_pass.set_bind_group(1, &self.camera_bind_group, &[]); // index = group in shader.wgsl
             
             for id in &self.entity_ids {
                 let entity = match self.entities.get(id) {
                     Some(e) => e,
                     None => continue,
                 };
+
+                if matches!(self.mode, Mode::Mode2D) && entity.model.is_some() {
+                    continue;
+                }
+
                 if let Some(model) = &entity.model {
                     render_pass.set_vertex_buffer(1, entity.instance_buffer.slice(..));
                     render_pass.draw_model_instanced(
@@ -409,6 +431,8 @@ impl State {
                         &self.camera_bind_group,
                     );
                 } else {
+                    render_pass.set_bind_group(0, &self.diffuse_bind_group, &[]);
+                    render_pass.set_bind_group(1, &self.camera_bind_group, &[]);
                     render_pass.set_vertex_buffer(0, entity.vertex_buffer.slice(..));
                     render_pass.set_vertex_buffer(1, entity.instance_buffer.slice(..));
                     render_pass.set_index_buffer(entity.index_buffer.slice(..), wgpu::IndexFormat::Uint16);

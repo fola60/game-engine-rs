@@ -10,10 +10,11 @@ pub mod entity;
 pub mod engine_context;
 pub mod model;
 pub mod resources;
+pub mod world_units;
 
 // Draw a 2d circle 
 
-const Z: f32 = 0.0;
+pub const Z: f32 = 0.0;
 pub struct Point2D {
     pub x: f32,
     pub y: f32

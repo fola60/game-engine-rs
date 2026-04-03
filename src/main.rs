@@ -1,8 +1,6 @@
 use cgmath::{Point3, Vector3};
 use game_engine_rs::{
-    engine::{Engine, GameLoop},
-    engine_context::EngineContext,
-    Color, Mode, Point2D,
+    Color, Mode, Point2D, Z, engine::{Engine, GameLoop}, engine_context::EngineContext
 };
 
 use winit::{
@@ -19,28 +17,25 @@ struct MyGame {
 
 impl GameLoop for MyGame {
     fn startup(&mut self, ctx: &mut EngineContext) {
-        // ctx.add_circle(1, 50.5);
-        // ctx.add_rectangle(self.rectangle_id, 20.0, 10.0);
+        ctx.add_circle(1, 1.0);
+        ctx.add_rectangle(self.rectangle_id, 1.0, 1.0);
         let res = ctx.add_entity_from_model(3, "res/cube.obj");
-        println!("Result: {:?}", res);
+
 
         ctx.set_target_fps(60);
         ctx.set_mode(Mode::Mode3D);
     }
 
     fn game_loop(&mut self, ctx: &mut EngineContext, event: WindowEvent) {
-        // let width = 0.5;
-        // let height = 0.5;
-        // ctx.draw_rectangle(Point2D {x: -0.5, y: 0.5}, width, height);
-        ctx.clear_background(Color::Black);
-        // let _ = ctx.draw_circle(1, &self.ball_pos, Color::Black);
-        // let _ = ctx.draw_rectangle(self.rectangle_id, &Point2D { x: 200.0, y: 200.0 }, Color::Yellow);
+        ctx.draw_rectangle(self.rectangle_id, &Point2D::default(), Color::Green);
+        ctx.clear_background(Color::White);
+        let _ = ctx.draw_circle(1, &self.ball_pos, Color::Black);
         let _ = ctx.draw_entity(
             3,
             Vector3 {
-                x: 0.0,
-                y: -0.5,
-                z: 0.0,
+                x: 5.0,
+                y: 0.5,
+                z: Z,
             },
         );
         match event {
@@ -50,14 +45,14 @@ impl GameLoop for MyGame {
                 is_synthetic: _,
             } => match event.physical_key {
                 PhysicalKey::Code(code) => match code {
-                    KeyCode::ArrowLeft => self.ball_pos.x -= 5.0,
-                    KeyCode::ArrowRight => self.ball_pos.x += 5.0,
-                    KeyCode::ArrowDown => self.ball_pos.y -= 5.0,
-                    KeyCode::ArrowUp => self.ball_pos.y += 5.0,
-                    KeyCode::KeyA => self.camera_eye.x -= 5.1,
-                    KeyCode::KeyD => self.camera_eye.x += 5.1,
-                    KeyCode::KeyS => self.camera_eye.z -= 5.1,
-                    KeyCode::KeyW => self.camera_eye.z += 5.1,
+                    KeyCode::ArrowLeft => self.ball_pos.x -= 0.1,
+                    KeyCode::ArrowRight => self.ball_pos.x += 0.1,
+                    KeyCode::ArrowDown => self.ball_pos.y -= 0.1,
+                    KeyCode::ArrowUp => self.ball_pos.y += 0.1,
+                    KeyCode::KeyA => self.camera_eye.x -= 0.1,
+                    KeyCode::KeyD => self.camera_eye.x += 0.1,
+                    KeyCode::KeyS => self.camera_eye.z -= 0.1,
+                    KeyCode::KeyW => self.camera_eye.z += 0.1,
                     KeyCode::Digit2 => ctx.set_mode(Mode::Mode2D),
                     KeyCode::Digit3 => ctx.set_mode(Mode::Mode3D),
                     _ => {}
@@ -80,8 +75,8 @@ fn main() -> anyhow::Result<()> {
             z: -5.0,
         },
         camera_target: Point3 {
-            x: 0.5,
-            y: 0.5,
+            x: 0.0,
+            y: 0.0,
             z: 0.0,
         },
         ball_pos: Point2D::default(),

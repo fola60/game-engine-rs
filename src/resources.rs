@@ -2,7 +2,7 @@ use std::path::Path;
 
 use wgpu::util::DeviceExt;
 
-use crate::{model, texture};
+use crate::{model, texture, world_units};
 
 pub fn load_string(file_name: &str) -> anyhow::Result<String> {
     Ok(std::fs::read_to_string(file_name)?)
@@ -111,9 +111,9 @@ pub fn load_model(
                     if m.mesh.normals.is_empty() {
                         model::ModelVertex {
                             position: [
-                                m.mesh.positions[i * 3],
-                                m.mesh.positions[i * 3 + 1],
-                                m.mesh.positions[i * 3 + 2],
+                                m.mesh.positions[i * 3] * world_units::MODEL_IMPORT_SCALE,
+                                m.mesh.positions[i * 3 + 1] * world_units::MODEL_IMPORT_SCALE,
+                                m.mesh.positions[i * 3 + 2] * world_units::MODEL_IMPORT_SCALE,
                             ],
                             tex_coords,
                             normal: [0.0, 0.0, 0.0],
@@ -121,9 +121,9 @@ pub fn load_model(
                     } else {
                         model::ModelVertex {
                             position: [
-                                m.mesh.positions[i * 3],
-                                m.mesh.positions[i * 3 + 1],
-                                m.mesh.positions[i * 3 + 2],
+                                m.mesh.positions[i * 3] * world_units::MODEL_IMPORT_SCALE,
+                                m.mesh.positions[i * 3 + 1] * world_units::MODEL_IMPORT_SCALE,
+                                m.mesh.positions[i * 3 + 2] * world_units::MODEL_IMPORT_SCALE,
                             ],
                             tex_coords,
                             normal: [
