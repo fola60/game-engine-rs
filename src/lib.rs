@@ -10,6 +10,7 @@ pub mod entity;
 pub mod engine_context;
 pub mod model;
 pub mod resources;
+pub mod text;
 pub mod world_units;
 
 // Draw a 2d circle 

@@ -7,6 +7,7 @@ use crate::{
     entity::{self, Entity},
     model::{DrawModel, ModelVertex, Vertex},
     renderer::{EntityType, Renderer},
+    text::TextRenderer,
     texture::Texture,
     Color, Instance, InstanceRaw, Mode, Point2D,
 };
@@ -36,6 +37,7 @@ pub struct State {
     pub instances: Vec<Instance>,
     pub instance_buffer: wgpu::Buffer,
     pub renderer: Renderer,
+    pub text_renderer: TextRenderer,
     pub background: Color,
     pub mode: Mode,
     pub text: Vec<(String, f32, f32, u8)>,
@@ -286,6 +288,7 @@ impl State {
         let screen_width = config.width;
         let screen_height = config.height;
         let depth_texture = Texture::create_depth_texture(&device, &config, "depth_texture");
+        let text_renderer = TextRenderer::new(&device, &queue, config.format)?;
  
 
         Ok(Self {
@@ -309,6 +312,7 @@ impl State {
             instances,
             instance_buffer,
             renderer: Renderer { entity_vertex_data: vec![], screen_width, screen_height},
+            text_renderer,
             background: Color::White,
             mode: Mode::Mode2D,
             text: vec![],
@@ -444,8 +448,19 @@ impl State {
 
 
         // submit will accept anything that implements IntoIter
+        self.text_renderer.render_text(
+            &self.device,
+            &self.queue,
+            &view,
+            &mut encoder,
+            self.config.width,
+            self.config.height,
+            &self.text,
+        );
+
         self.queue.submit(std::iter::once(encoder.finish()));
         output.present();
+        self.text.clear();
 
         Ok(())
     }

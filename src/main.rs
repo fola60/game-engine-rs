@@ -1,6 +1,8 @@
 use cgmath::{Point3, Vector3};
 use game_engine_rs::{
-    Color, Mode, Point2D, Z, engine::{Engine, GameLoop}, engine_context::EngineContext
+    engine::{Engine, GameLoop},
+    engine_context::EngineContext,
+    Color, Mode, Point2D, Z,
 };
 
 use winit::{
@@ -21,7 +23,6 @@ impl GameLoop for MyGame {
         ctx.add_rectangle(self.rectangle_id, 1.0, 1.0);
         let res = ctx.add_entity_from_model(3, "res/cube.obj");
 
-
         ctx.set_target_fps(60);
         ctx.set_mode(Mode::Mode3D);
     }
@@ -29,6 +30,7 @@ impl GameLoop for MyGame {
     fn game_loop(&mut self, ctx: &mut EngineContext, event: WindowEvent) {
         ctx.draw_rectangle(self.rectangle_id, &Point2D::default(), Color::Green);
         ctx.clear_background(Color::White);
+        ctx.draw_text(Point2D { x: 20.0, y: 20.0 }, "HUD: Hello text", 28);
         let _ = ctx.draw_circle(1, &self.ball_pos, Color::Black);
         let _ = ctx.draw_entity(
             3,
