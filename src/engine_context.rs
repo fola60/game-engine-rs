@@ -187,6 +187,183 @@ impl<'a> EngineContext<'a> {
         );
     }
 
+    pub fn draw_cube(
+        &mut self,
+        id: u32,
+        width: f32,
+        height: f32,
+        length: f32,
+        position: Vector3<f32>,
+        color: Color,
+    ) -> bool {
+        let half_w = world_units::meters_to_world(width) * 0.5;
+        let half_h = world_units::meters_to_world(height) * 0.5;
+        let half_l = world_units::meters_to_world(length) * 0.5;
+
+        let vertices = vec![
+            // Front (+Z)
+            crate::model::ModelVertex {
+                position: [-half_w, -half_h, half_l],
+                tex_coords: [0.0, 1.0],
+                normal: [0.0, 0.0, 1.0],
+            },
+            crate::model::ModelVertex {
+                position: [half_w, -half_h, half_l],
+                tex_coords: [1.0, 1.0],
+                normal: [0.0, 0.0, 1.0],
+            },
+            crate::model::ModelVertex {
+                position: [half_w, half_h, half_l],
+                tex_coords: [1.0, 0.0],
+                normal: [0.0, 0.0, 1.0],
+            },
+            crate::model::ModelVertex {
+                position: [-half_w, half_h, half_l],
+                tex_coords: [0.0, 0.0],
+                normal: [0.0, 0.0, 1.0],
+            },
+            // Back (-Z)
+            crate::model::ModelVertex {
+                position: [half_w, -half_h, -half_l],
+                tex_coords: [0.0, 1.0],
+                normal: [0.0, 0.0, -1.0],
+            },
+            crate::model::ModelVertex {
+                position: [-half_w, -half_h, -half_l],
+                tex_coords: [1.0, 1.0],
+                normal: [0.0, 0.0, -1.0],
+            },
+            crate::model::ModelVertex {
+                position: [-half_w, half_h, -half_l],
+                tex_coords: [1.0, 0.0],
+                normal: [0.0, 0.0, -1.0],
+            },
+            crate::model::ModelVertex {
+                position: [half_w, half_h, -half_l],
+                tex_coords: [0.0, 0.0],
+                normal: [0.0, 0.0, -1.0],
+            },
+            // Left (-X)
+            crate::model::ModelVertex {
+                position: [-half_w, -half_h, -half_l],
+                tex_coords: [0.0, 1.0],
+                normal: [-1.0, 0.0, 0.0],
+            },
+            crate::model::ModelVertex {
+                position: [-half_w, -half_h, half_l],
+                tex_coords: [1.0, 1.0],
+                normal: [-1.0, 0.0, 0.0],
+            },
+            crate::model::ModelVertex {
+                position: [-half_w, half_h, half_l],
+                tex_coords: [1.0, 0.0],
+                normal: [-1.0, 0.0, 0.0],
+            },
+            crate::model::ModelVertex {
+                position: [-half_w, half_h, -half_l],
+                tex_coords: [0.0, 0.0],
+                normal: [-1.0, 0.0, 0.0],
+            },
+            // Right (+X)
+            crate::model::ModelVertex {
+                position: [half_w, -half_h, half_l],
+                tex_coords: [0.0, 1.0],
+                normal: [1.0, 0.0, 0.0],
+            },
+            crate::model::ModelVertex {
+                position: [half_w, -half_h, -half_l],
+                tex_coords: [1.0, 1.0],
+                normal: [1.0, 0.0, 0.0],
+            },
+            crate::model::ModelVertex {
+                position: [half_w, half_h, -half_l],
+                tex_coords: [1.0, 0.0],
+                normal: [1.0, 0.0, 0.0],
+            },
+            crate::model::ModelVertex {
+                position: [half_w, half_h, half_l],
+                tex_coords: [0.0, 0.0],
+                normal: [1.0, 0.0, 0.0],
+            },
+            // Top (+Y)
+            crate::model::ModelVertex {
+                position: [-half_w, half_h, half_l],
+                tex_coords: [0.0, 1.0],
+                normal: [0.0, 1.0, 0.0],
+            },
+            crate::model::ModelVertex {
+                position: [half_w, half_h, half_l],
+                tex_coords: [1.0, 1.0],
+                normal: [0.0, 1.0, 0.0],
+            },
+            crate::model::ModelVertex {
+                position: [half_w, half_h, -half_l],
+                tex_coords: [1.0, 0.0],
+                normal: [0.0, 1.0, 0.0],
+            },
+            crate::model::ModelVertex {
+                position: [-half_w, half_h, -half_l],
+                tex_coords: [0.0, 0.0],
+                normal: [0.0, 1.0, 0.0],
+            },
+            // Bottom (-Y)
+            crate::model::ModelVertex {
+                position: [-half_w, -half_h, -half_l],
+                tex_coords: [0.0, 1.0],
+                normal: [0.0, -1.0, 0.0],
+            },
+            crate::model::ModelVertex {
+                position: [half_w, -half_h, -half_l],
+                tex_coords: [1.0, 1.0],
+                normal: [0.0, -1.0, 0.0],
+            },
+            crate::model::ModelVertex {
+                position: [half_w, -half_h, half_l],
+                tex_coords: [1.0, 0.0],
+                normal: [0.0, -1.0, 0.0],
+            },
+            crate::model::ModelVertex {
+                position: [-half_w, -half_h, half_l],
+                tex_coords: [0.0, 0.0],
+                normal: [0.0, -1.0, 0.0],
+            },
+        ];
+
+        let indicies: Vec<u16> = vec![
+            0, 1, 2, 0, 2, 3, // front
+            4, 5, 6, 4, 6, 7, // back
+            8, 9, 10, 8, 10, 11, // left
+            12, 13, 14, 12, 14, 15, // right
+            16, 17, 18, 16, 18, 19, // top
+            20, 21, 22, 20, 22, 23, // bottom
+        ];
+
+        let entity_vertex_data = VertexIndicie {
+            vertexes: vertices,
+            indicies,
+            entity_type: EntityType::VertIndicie,
+        };
+
+        self.entities.insert(
+            id,
+            Entity::new(
+                id,
+                entity_vertex_data,
+                1,
+                Vector3 {
+                    x: 0.0,
+                    y: 0.0,
+                    z: Z,
+                },
+                self.device,
+            ),
+        );
+
+        self.set_location(id, position);
+        self.set_color(id, color);
+        self.entity_ids.insert(id)
+    }
+
     pub fn add_entity_from_model(&mut self, id: u32, model_path: &str) -> anyhow::Result<()> {
         let model = resources::load_model(
             model_path,

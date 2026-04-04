@@ -15,13 +15,26 @@ struct MyGame {
     camera_target: Point3<f32>,
     ball_pos: Point2D,
     rectangle_id: u32,
+    cube_id: u32,
 }
 
 impl GameLoop for MyGame {
     fn startup(&mut self, ctx: &mut EngineContext) {
         ctx.add_circle(1, 1.0);
         ctx.add_rectangle(self.rectangle_id, 1.0, 1.0);
-        let res = ctx.add_entity_from_model(3, "res/cube.obj");
+        let _res = ctx.add_entity_from_model(3, "res/cube.obj");
+        let _ = ctx.draw_cube(
+            self.cube_id,
+            1.0,
+            1.0,
+            1.0,
+            Vector3 {
+                x: -2.0,
+                y: 0.5,
+                z: Z,
+            },
+            Color::Blue,
+        );
 
         ctx.set_target_fps(60);
         ctx.set_mode(Mode::Mode3D);
@@ -36,6 +49,14 @@ impl GameLoop for MyGame {
             3,
             Vector3 {
                 x: 5.0,
+                y: 0.5,
+                z: Z,
+            },
+        );
+        ctx.draw_entity(
+            self.cube_id,
+            Vector3 {
+                x: -2.0,
                 y: 0.5,
                 z: Z,
             },
@@ -83,6 +104,7 @@ fn main() -> anyhow::Result<()> {
         },
         ball_pos: Point2D::default(),
         rectangle_id: 0,
+        cube_id: 4,
     };
     let app = Engine::init(my_game, 2700, 1600, "Game engine");
     app.run()
