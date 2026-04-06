@@ -39,6 +39,12 @@ impl<'a> EngineContext<'a> {
         self.entity_ids.insert(id)
     }
 
+    pub fn draw_cube(&mut self, id: u32, position: Vector3<f32>, color: Color) -> bool {
+        self.set_location(id, position);
+        self.set_color(id, color);
+        self.entity_ids.insert(id)
+    }
+
     pub fn add_circle(&mut self, id: u32, radius: f32) {
         let segments = 32; // increase for smoother circle
         let radius = world_units::meters_to_world(radius);
@@ -187,15 +193,7 @@ impl<'a> EngineContext<'a> {
         );
     }
 
-    pub fn draw_cube(
-        &mut self,
-        id: u32,
-        width: f32,
-        height: f32,
-        length: f32,
-        position: Vector3<f32>,
-        color: Color,
-    ) -> bool {
+    pub fn add_cube(&mut self, id: u32, width: f32, height: f32, length: f32) {
         let half_w = world_units::meters_to_world(width) * 0.5;
         let half_h = world_units::meters_to_world(height) * 0.5;
         let half_l = world_units::meters_to_world(length) * 0.5;
@@ -358,10 +356,6 @@ impl<'a> EngineContext<'a> {
                 self.device,
             ),
         );
-
-        self.set_location(id, position);
-        self.set_color(id, color);
-        self.entity_ids.insert(id)
     }
 
     pub fn add_entity_from_model(&mut self, id: u32, model_path: &str) -> anyhow::Result<()> {

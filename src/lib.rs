@@ -35,13 +35,21 @@ impl Default for Point2D {
 
 pub enum Color {
     Red,
+    LightRed,
     Green,
+    LightGreen,
     Blue,
+    LightBlue,
     White,
+    LightGray,
     Black,
+    LightBlack,
     Yellow,
+    LightYellow,
     Cyan,
+    LightCyan,
     Magenta,
+    LightMagenta,
     Custom(f32, f32, f32, f32),
 }
 
@@ -49,13 +57,21 @@ impl Color {
     pub fn to_rgba(&self) -> [f32; 4] {
         match self {
             Color::Red     => [1.0, 0.0, 0.0, 1.0],
+            Color::LightRed => [1.0, 0.5, 0.5, 1.0],
             Color::Green   => [0.0, 1.0, 0.0, 1.0],
+            Color::LightGreen => [0.5, 1.0, 0.5, 1.0],
             Color::Blue    => [0.0, 0.0, 1.0, 1.0],
+            Color::LightBlue => [0.5, 0.5, 1.0, 1.0],
             Color::White   => [1.0, 1.0, 1.0, 1.0],
+            Color::LightGray => [0.85, 0.85, 0.85, 1.0],
             Color::Black   => [0.0, 0.0, 0.0, 1.0],
+            Color::LightBlack => [0.2, 0.2, 0.2, 1.0],
             Color::Yellow  => [1.0, 1.0, 0.0, 1.0],
+            Color::LightYellow => [1.0, 1.0, 0.6, 1.0],
             Color::Cyan    => [0.0, 1.0, 1.0, 1.0],
+            Color::LightCyan => [0.6, 1.0, 1.0, 1.0],
             Color::Magenta => [1.0, 0.0, 1.0, 1.0],
+            Color::LightMagenta => [1.0, 0.6, 1.0, 1.0],
             Color::Custom(r, g, b, a) => [*r, *g, *b, *a],
         }
     }

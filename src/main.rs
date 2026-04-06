@@ -23,19 +23,7 @@ impl GameLoop for MyGame {
         ctx.add_circle(1, 1.0);
         ctx.add_rectangle(self.rectangle_id, 1.0, 1.0);
         let _res = ctx.add_entity_from_model(3, "res/cube.obj");
-        let _ = ctx.draw_cube(
-            self.cube_id,
-            1.0,
-            1.0,
-            1.0,
-            Vector3 {
-                x: -2.0,
-                y: 0.5,
-                z: Z,
-            },
-            Color::Blue,
-        );
-
+        ctx.add_cube(self.cube_id, 1.0, 1.0, 1.0);
         ctx.set_target_fps(60);
         ctx.set_mode(Mode::Mode3D);
     }
@@ -53,13 +41,14 @@ impl GameLoop for MyGame {
                 z: Z,
             },
         );
-        ctx.draw_entity(
+        let _ = ctx.draw_cube(
             self.cube_id,
             Vector3 {
                 x: -2.0,
                 y: 0.5,
                 z: Z,
             },
+            Color::LightBlue,
         );
         match event {
             WindowEvent::KeyboardInput {
