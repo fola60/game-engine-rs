@@ -11,6 +11,7 @@ pub mod engine_context;
 pub mod model;
 pub mod resources;
 pub mod text;
+pub mod gesture;
 pub mod world_units;
 
 // Draw a 2d circle 
@@ -51,6 +52,48 @@ pub enum Color {
     Magenta,
     LightMagenta,
     Custom(f32, f32, f32, f32),
+}
+
+#[derive(Clone, Copy, Debug)]
+pub enum Gesture {
+    SwipeUp(f32),
+    SwipeDown(f32),
+    SwipeLeft(f32),
+    SwipeRight(f32)
+}
+
+impl Gesture {
+    pub fn get_gesture(
+        start: &Point2D,
+        end: &Point2D,
+        duration_secs: f32,
+        min_distance: f32,
+        max_duration_secs: f32,
+    ) -> Option<Self> {
+        if duration_secs > max_duration_secs {
+            return None;
+        }
+
+        let dx = end.x - start.x;
+        let dy = end.y - start.y;
+        let distance = (dx * dx + dy * dy).sqrt();
+
+        if distance < min_distance {
+            return None;
+        }
+
+        let angle_deg = dy.atan2(dx).to_degrees();
+
+        if (-30.0..=30.0).contains(&angle_deg) {
+            Some(Gesture::SwipeRight(angle_deg))
+        } else if (45.0..=135.0).contains(&angle_deg) {
+            Some(Gesture::SwipeDown(angle_deg))
+        } else if angle_deg >= 150.0 || angle_deg <= -150.0 {
+            Some(Gesture::SwipeLeft(angle_deg))
+        } else {
+            Some(Gesture::SwipeUp(angle_deg))
+        }
+    }
 }
 
 impl Color {

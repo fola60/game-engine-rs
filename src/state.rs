@@ -5,11 +5,12 @@ use cgmath::{InnerSpace, RelativeEq, Rotation3, Vector3, Zero, prelude};
 use crate::{
     camera::{Camera, CameraController, CameraUniform},
     entity::{self, Entity},
+    gesture::SwipeTracker,
     model::{DrawModel, ModelVertex, Vertex},
     renderer::{EntityType, Renderer},
     text::TextRenderer,
     texture::Texture,
-    Color, Instance, InstanceRaw, Mode, Point2D,
+    Color, Gesture, Instance, InstanceRaw, Mode, Point2D,
 };
 
 
@@ -41,6 +42,9 @@ pub struct State {
     pub background: Color,
     pub mode: Mode,
     pub text: Vec<(String, f32, f32, u8)>,
+    pub gesture: Option<Gesture>,
+    pub swipe_tracker: SwipeTracker,
+    pub pointer_position: Point2D,
     pub entities: HashMap<u32, Entity>,
     pub entity_ids: HashSet<u32>,
 }
@@ -316,6 +320,9 @@ impl State {
             background: Color::White,
             mode: Mode::Mode2D,
             text: vec![],
+            gesture: None,
+            swipe_tracker: SwipeTracker::new(),
+            pointer_position: Point2D::default(),
             entities: HashMap::new(),
             entity_ids: HashSet::new(),
         })

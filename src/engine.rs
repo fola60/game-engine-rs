@@ -15,6 +15,9 @@ pub struct Engine<G: GameLoop + 'static> {
     screen_height: u32,
     title: String,
     last_frame_time: Option<Instant>,
+    frame_counter: u32,
+    last_tap: Option<u32>,
+    last_hold: Option<u32>,
     pub window: Option<Arc<dyn Window>>,
     pub state: Option<State>,
     pub fps: u32,
@@ -25,11 +28,14 @@ impl<G: GameLoop> Engine<G> {
         Self {
             game,
             initialized: false,
-            window: None,
             screen_width,
             screen_height,
             title: String::from(title),
             last_frame_time: None,
+            frame_counter: 0,
+            last_tap: None,
+            last_hold: None,
+            window: None,
             state: None,
             fps: 60,
         }
@@ -82,7 +88,7 @@ impl<G: GameLoop> ApplicationHandler for Engine<G> {
             None => return,
         };
 
-        match event {
+        match &event {
             WindowEvent::CloseRequested => event_loop.exit(),
             WindowEvent::RedrawRequested => {
                 state.update();
@@ -106,8 +112,41 @@ impl<G: GameLoop> ApplicationHandler for Engine<G> {
                         ..
                     },
                 ..
-            } => state.handle_key(event_loop, code, key_state.is_pressed()),
+            } => state.handle_key(event_loop, *code, key_state.is_pressed()),
             WindowEvent::SurfaceResized(size) => state.resize(size.width, size.height),
+            WindowEvent::PointerMoved {
+                position, primary, ..
+            } => {
+                state.pointer_position = crate::Point2D {
+                    x: position.x as f32,
+                    y: position.y as f32,
+                };
+                if *primary {
+                    state
+                        .swipe_tracker
+                        .pointer_move(state.pointer_position.clone());
+                }
+            }
+            WindowEvent::PointerButton {
+                state: button_state,
+                primary,
+                ..
+            } => {
+                if !*primary {
+                    return;
+                }
+                let now = Instant::now();
+                if button_state.is_pressed() {
+                    state
+                        .swipe_tracker
+                        .pointer_down(state.pointer_position.clone(), now);
+                } else if let Some(gesture) = state
+                    .swipe_tracker
+                    .pointer_up(state.pointer_position.clone(), now)
+                {
+                    state.gesture = Some(gesture);
+                }
+            }
             _ => {}
         }
 
@@ -140,6 +179,7 @@ impl<G: GameLoop> ApplicationHandler for Engine<G> {
             background: &mut state.background,
             mode: &mut state.mode,
             text: &mut state.text,
+            gesture: &mut state.gesture,
             fps: &mut self.fps,
             dt: dt,
         };

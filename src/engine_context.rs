@@ -2,7 +2,7 @@ use crate::{
     camera::Camera,
     entity::Entity,
     renderer::{EntityType, VertexIndicie},
-    resources, world_units, Color, Mode, Point2D, Z,
+    resources, world_units, Color, Gesture, Mode, Point2D, Z,
 };
 use cgmath::{Point3, Vector3};
 use std::collections::{HashMap, HashSet};
@@ -17,11 +17,20 @@ pub struct EngineContext<'a> {
     pub(crate) background: &'a mut Color,
     pub(crate) mode: &'a mut Mode,
     pub(crate) text: &'a mut Vec<(String, f32, f32, u8)>,
+    pub(crate) gesture: &'a mut Option<Gesture>,
     pub(crate) fps: &'a mut u32,
     pub(crate) dt: f32,
 }
 
 impl<'a> EngineContext<'a> {
+    pub fn get_dt(&self) -> f32 {
+        self.dt
+    }
+
+    pub fn get_gesture(&self) -> Option<Gesture> {
+        *self.gesture
+    }
+
     pub fn clear_background(&mut self, color: Color) {
         *self.background = color;
     }
