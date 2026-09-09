@@ -373,10 +373,6 @@ impl State {
 
 
     pub fn render(&mut self) -> Result<(), wgpu::SurfaceError> {
-        self.update();
-        self.window.request_redraw();
-
-
         if !self.is_surface_configured {
             return Ok(());
         }

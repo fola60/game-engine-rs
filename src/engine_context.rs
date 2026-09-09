@@ -1,8 +1,11 @@
 use crate::{
+    Color, Gesture, Mode, Point2D, Z,
     camera::Camera,
     entity::Entity,
     renderer::{EntityType, VertexIndicie},
-    resources, world_units, Color, Gesture, Mode, Point2D, Z,
+    resources,
+    state::State,
+    world_units,
 };
 use cgmath::{Point3, Vector3};
 use std::collections::{HashMap, HashSet};
@@ -19,16 +22,31 @@ pub struct EngineContext<'a> {
     pub(crate) text: &'a mut Vec<(String, f32, f32, u8)>,
     pub(crate) gesture: &'a mut Option<Gesture>,
     pub(crate) fps: &'a mut u32,
-    pub(crate) dt: f32,
 }
 
 impl<'a> EngineContext<'a> {
-    pub fn get_dt(&self) -> f32 {
-        self.dt
+    pub(crate) fn new(state: &'a mut State, fps: &'a mut u32) -> Self {
+        Self {
+            entities: &mut state.entities,
+            entity_ids: &mut state.entity_ids,
+            device: &state.device,
+            queue: &state.queue,
+            texture_bind_group_layout: &state.texture_bind_group_layout,
+            camera: &mut state.camera,
+            background: &mut state.background,
+            mode: &mut state.mode,
+            text: &mut state.text,
+            gesture: &mut state.gesture,
+            fps,
+        }
     }
 
     pub fn get_gesture(&self) -> Option<Gesture> {
         *self.gesture
+    }
+
+    pub fn take_gesture(&mut self) -> Option<Gesture> {
+        self.gesture.take()
     }
 
     pub fn clear_background(&mut self, color: Color) {
@@ -424,6 +442,6 @@ impl<'a> EngineContext<'a> {
     }
 
     pub fn set_target_fps(&mut self, fps: u32) {
-        *self.fps = fps;
+        *self.fps = fps.max(1);
     }
 }

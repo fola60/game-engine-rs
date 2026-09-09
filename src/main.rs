@@ -1,7 +1,7 @@
 use game_engine_rs::{
+    Color, Gesture, Mode, Point2D,
     engine::{Engine, GameLoop},
     engine_context::EngineContext,
-    Color, Gesture, Mode, Point2D,
 };
 use winit::event::WindowEvent;
 
@@ -26,11 +26,13 @@ impl GameLoop for GestureDemo {
         ctx.set_target_fps(60);
     }
 
-    fn game_loop(&mut self, ctx: &mut EngineContext, _event: WindowEvent) {
-        if let Some(gesture) = ctx.get_gesture() {
+    fn event(&mut self, ctx: &mut EngineContext, _event: &WindowEvent) {
+        if let Some(gesture) = ctx.take_gesture() {
             self.latest = Self::format_gesture(gesture);
         }
+    }
 
+    fn render(&mut self, ctx: &mut EngineContext) {
         ctx.clear_background(Color::White);
         ctx.draw_text(Point2D { x: 20.0, y: 20.0 }, "Swipe and release", 34);
         ctx.draw_text(Point2D { x: 20.0, y: 60.0 }, &self.latest, 28);
