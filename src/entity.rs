@@ -1,8 +1,8 @@
 use crate::{
+    Instance, InstanceRaw, Transform,
     model::Model,
     renderer::{EntityType, VertexIndicie},
     texture::Texture,
-    Instance,
 };
 use cgmath::{InnerSpace, Rotation3, Zero};
 use image::GenericImageView;
@@ -19,8 +19,9 @@ pub struct Entity {
     pub(crate) diffuse_texture_name: Option<String>,
     pub(crate) texture: Option<Texture>,
     pub(crate) model: Option<Model>,
-    pub(crate) location: [f32; 3],
+    pub(crate) transform: Transform,
     pub(crate) color: [f32; 4],
+    pub(crate) instance_dirty: bool,
 }
 
 impl Entity {
@@ -40,14 +41,13 @@ impl Entity {
         })
     }
 
-    fn build_instance_buffer(
-        device: &wgpu::Device,
+    fn build_instances(
         num_instances: u32,
         instance_displacement: cgmath::Vector3<f32>,
-        location: [f32; 3],
+        transform: Transform,
         color: [f32; 4],
-    ) -> wgpu::Buffer {
-        let instances = (0..num_instances)
+    ) -> Vec<InstanceRaw> {
+        (0..num_instances)
             .flat_map(|z| {
                 (0..num_instances).map(move |x| {
                     let position = cgmath::Vector3 {
@@ -68,31 +68,46 @@ impl Entity {
                     };
 
                     Instance {
-                        position,
-                        rotation,
-                        vertex_offset: location.into(),
+                        model: transform.matrix()
+                            * cgmath::Matrix4::from_translation(position)
+                            * cgmath::Matrix4::from(rotation),
                         color: color.into(),
                     }
+                    .to_raw()
                 })
             })
-            .collect::<Vec<_>>();
+            .collect()
+    }
 
-        let instance_data = instances.iter().map(Instance::to_raw).collect::<Vec<_>>();
+    fn build_instance_buffer(
+        device: &wgpu::Device,
+        num_instances: u32,
+        instance_displacement: cgmath::Vector3<f32>,
+        transform: Transform,
+        color: [f32; 4],
+    ) -> wgpu::Buffer {
+        let instances =
+            Self::build_instances(num_instances, instance_displacement, transform, color);
         device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("Instance Buffer"),
-            contents: bytemuck::cast_slice(&instance_data),
-            usage: wgpu::BufferUsages::VERTEX,
+            contents: bytemuck::cast_slice(&instances),
+            usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
         })
     }
 
-    pub(crate) fn rebuild_instance_buffer(&mut self, device: &wgpu::Device) {
-        self.instance_buffer = Self::build_instance_buffer(
-            device,
+    pub(crate) fn sync_instance_buffer(&mut self, queue: &wgpu::Queue) {
+        if !self.instance_dirty {
+            return;
+        }
+
+        let instances = Self::build_instances(
             self.num_instances,
             self.instance_displacement,
-            self.location,
+            self.transform,
             self.color,
         );
+        queue.write_buffer(&self.instance_buffer, 0, bytemuck::cast_slice(&instances));
+        self.instance_dirty = false;
     }
 
     pub fn set_material_color(&self, queue: &mut wgpu::Queue, material_buffer: &mut wgpu::Buffer) {
@@ -150,7 +165,7 @@ impl Entity {
         instance_displacement: cgmath::Vector3<f32>,
         device: &wgpu::Device,
     ) -> Entity {
-        let location = [0.0, 0.0, 0.0];
+        let transform = Transform::default();
         let color = [1.0, 1.0, 1.0, 1.0];
         let vertex_buffer = Self::build_vertex_buffer(device, &vertex_data);
         let index_buffer = Self::build_index_buffer(device, &vertex_data);
@@ -158,7 +173,7 @@ impl Entity {
             device,
             num_instances_per_row,
             instance_displacement,
-            location,
+            transform,
             color,
         );
 
@@ -173,8 +188,9 @@ impl Entity {
             diffuse_texture_name: None,
             texture: None,
             model: None,
-            location,
+            transform,
             color,
+            instance_dirty: false,
         }
     }
 

@@ -1,7 +1,6 @@
 use std::{collections::{HashMap, HashSet}, sync::Arc};
 use winit::{dpi::PhysicalPosition, event::PointerSource, event_loop::ActiveEventLoop, keyboard::KeyCode, window::Window};
 use wgpu::util::DeviceExt;
-use cgmath::{InnerSpace, RelativeEq, Rotation3, Vector3, Zero, prelude};
 use crate::{
     camera::{Camera, CameraController, CameraUniform},
     entity::{self, Entity},
@@ -10,7 +9,7 @@ use crate::{
     renderer::{EntityType, Renderer},
     text::TextRenderer,
     texture::Texture,
-    Color, Gesture, Instance, InstanceRaw, Mode, Point2D,
+    Color, Gesture, InstanceRaw, Mode, Point2D,
 };
 
 
@@ -35,8 +34,6 @@ pub struct State {
     pub camera_controller: CameraController,
     pub texture_bind_group_layout: wgpu::BindGroupLayout,
     pub swap: bool,
-    pub instances: Vec<Instance>,
-    pub instance_buffer: wgpu::Buffer,
     pub renderer: Renderer,
     pub text_renderer: TextRenderer,
     pub background: Color,
@@ -258,37 +255,6 @@ impl State {
             multiview: None, // 5.
             cache: None, // 6.
         });
-        const NUM_INSTANCES_PER_ROW: u32 = 10;
-        const INSTANCE_DISPLACEMENT: cgmath::Vector3<f32> = cgmath::Vector3::new(NUM_INSTANCES_PER_ROW as f32 * 0.5, 0.0, NUM_INSTANCES_PER_ROW as f32 * 0.5);
-
-
-        let instances = (0..NUM_INSTANCES_PER_ROW).flat_map(|z| {
-            (0..NUM_INSTANCES_PER_ROW).map(move |x| {
-                let position = cgmath::Vector3 { x: x as f32, y: 0.0, z: z as f32 } - INSTANCE_DISPLACEMENT;
-
-                let rotation = if position.is_zero() {
-                    // this is needed so an object at (0, 0, 0) won't get scaled to zero
-                    // as Quaternions can affect scale if they're not created correctly
-                    cgmath::Quaternion::from_axis_angle(cgmath::Vector3::unit_z(), cgmath::Deg(0.0))
-                } else {
-                    cgmath::Quaternion::from_axis_angle(position.normalize(), cgmath::Deg(45.0))
-                };
-
-                Instance {
-                    position, rotation, vertex_offset: Vector3 { x: 0.0, y: 0.0, z: 0.0 }, color: cgmath::Vector4 { x: 0.0, y: 0.0, z: 0.0, w: 0.0 }
-                }
-            })
-        }).collect::<Vec<_>>();
-
-        let instance_data = instances.iter().map(Instance::to_raw).collect::<Vec<_>>();
-        let instance_buffer = device.create_buffer_init(
-            &wgpu::util::BufferInitDescriptor {
-                label: Some("Instance Buffer"),
-                contents: bytemuck::cast_slice(&instance_data),
-                usage: wgpu::BufferUsages::VERTEX,
-            }
-        );
-
         let screen_width = config.width;
         let screen_height = config.height;
         let depth_texture = Texture::create_depth_texture(&device, &config, "depth_texture");
@@ -313,8 +279,6 @@ impl State {
             camera_controller,
             texture_bind_group_layout,
             swap: true,
-            instances,
-            instance_buffer,
             renderer: Renderer { entity_vertex_data: vec![], screen_width, screen_height},
             text_renderer,
             background: Color::White,
@@ -357,6 +321,10 @@ impl State {
     }
 
     pub fn update(&mut self) {
+        for entity in self.entities.values_mut() {
+            entity.sync_instance_buffer(&self.queue);
+        }
+
         match self.mode {
             Mode::Mode2D => {
                 let cam2d = Camera::get_2d_camera(self.config.width as f32, self.config.height as f32);

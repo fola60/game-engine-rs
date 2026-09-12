@@ -1,5 +1,5 @@
 use crate::{
-    Color, Gesture, Mode, Point2D, Z,
+    Color, Gesture, Mode, Point2D, Transform, Z,
     camera::Camera,
     entity::Entity,
     renderer::{EntityType, VertexIndicie},
@@ -7,7 +7,7 @@ use crate::{
     state::State,
     world_units,
 };
-use cgmath::{Point3, Vector3};
+use cgmath::{Point3, Quaternion, Vector3};
 use std::collections::{HashMap, HashSet};
 
 pub struct EngineContext<'a> {
@@ -413,18 +413,54 @@ impl<'a> EngineContext<'a> {
             .push((String::from(text), location.x, location.y, font_size));
     }
 
-    pub fn get_location(&mut self, id: u32) -> Option<Vector3<f32>> {
-        if let Some(entity) = self.entities.get(&id) {
-            Some(entity.location.into())
+    pub fn get_transform(&self, id: u32) -> Option<Transform> {
+        self.entities.get(&id).map(|entity| entity.transform)
+    }
+
+    pub fn set_transform(&mut self, id: u32, transform: Transform) -> bool {
+        if let Some(entity) = self.entities.get_mut(&id) {
+            entity.transform = transform;
+            entity.instance_dirty = true;
+            true
         } else {
-            None
+            false
         }
     }
 
+    pub fn get_location(&self, id: u32) -> Option<Vector3<f32>> {
+        self.entities
+            .get(&id)
+            .map(|entity| entity.transform.position)
+    }
+
     pub fn set_location(&mut self, id: u32, location: Vector3<f32>) -> bool {
+        self.set_position(id, location)
+    }
+
+    pub fn set_position(&mut self, id: u32, position: Vector3<f32>) -> bool {
         if let Some(entity) = self.entities.get_mut(&id) {
-            entity.location = [location.x, location.y, location.z];
-            entity.rebuild_instance_buffer(self.device);
+            entity.transform.position = position;
+            entity.instance_dirty = true;
+            true
+        } else {
+            false
+        }
+    }
+
+    pub fn set_rotation(&mut self, id: u32, rotation: Quaternion<f32>) -> bool {
+        if let Some(entity) = self.entities.get_mut(&id) {
+            entity.transform.rotation = rotation;
+            entity.instance_dirty = true;
+            true
+        } else {
+            false
+        }
+    }
+
+    pub fn set_scale(&mut self, id: u32, scale: Vector3<f32>) -> bool {
+        if let Some(entity) = self.entities.get_mut(&id) {
+            entity.transform.scale = scale;
+            entity.instance_dirty = true;
             true
         } else {
             false
@@ -434,7 +470,7 @@ impl<'a> EngineContext<'a> {
     pub fn set_color(&mut self, id: u32, color: Color) -> bool {
         if let Some(entity) = self.entities.get_mut(&id) {
             entity.color = color.to_rgba();
-            entity.rebuild_instance_buffer(self.device);
+            entity.instance_dirty = true;
             true
         } else {
             false
