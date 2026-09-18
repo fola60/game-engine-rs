@@ -207,7 +207,6 @@ impl Entity {
                 normal: [0.0, 0.0, 0.0],
             }],
             indicies: vec![0],
-            entity_type: EntityType::Model,
         };
 
         let mut entity = Self::new(id, vertex_data, 1, instance_displacement, device);

@@ -10,7 +10,6 @@ pub enum EntityType {
 pub(crate) struct VertexIndicie {
     pub(crate) vertexes: Vec<ModelVertex>,
     pub(crate) indicies: Vec<u16>,
-    pub(crate) entity_type: EntityType,
 }
 
 pub struct Renderer {
@@ -50,7 +49,6 @@ impl Renderer {
         let entity_vertex_data = VertexIndicie {
             vertexes: vec![top_left, top_right, bottom_left, bottom_right],
             indicies: vec![0, 1, 2, 2, 3, 1],
-            entity_type: EntityType::Rectangle,
         };
         self.entity_vertex_data.push(entity_vertex_data);
     }

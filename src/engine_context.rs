@@ -109,7 +109,6 @@ impl<'a> EngineContext<'a> {
         let data = VertexIndicie {
             vertexes: vertices,
             indicies: indices,
-            entity_type: EntityType::Circle,
         };
 
         self.entities.insert(
@@ -201,7 +200,6 @@ impl<'a> EngineContext<'a> {
         let entity_vertex_data = VertexIndicie {
             vertexes: vec![top_left, top_right, bottom_left, bottom_right],
             indicies: vec![0, 2, 1, 2, 3, 1],
-            entity_type: EntityType::Rectangle,
         };
 
         self.entities.insert(
@@ -366,7 +364,6 @@ impl<'a> EngineContext<'a> {
         let entity_vertex_data = VertexIndicie {
             vertexes: vertices,
             indicies,
-            entity_type: EntityType::VertIndicie,
         };
 
         self.entities.insert(
