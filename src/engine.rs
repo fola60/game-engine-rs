@@ -1,5 +1,6 @@
-use crate::{engine_context::EngineContext, state::State};
+use crate::{Dimension, TwoD, engine_context::EngineContext, state::State};
 use std::{
+    marker::PhantomData,
     sync::Arc,
     time::{Duration, Instant},
 };
@@ -11,8 +12,10 @@ use winit::event_loop::{ActiveEventLoop, ControlFlow, EventLoop};
 use winit::keyboard::PhysicalKey;
 use winit::window::{Window, WindowAttributes, WindowId};
 
-pub struct Engine<G: GameLoop + 'static> {
+pub struct Engine<D: Dimension, G = ()> {
     game: G,
+    pub scene: crate::scene::Scene<D>,
+    dimension: PhantomData<D>,
     initialized: bool,
     screen_width: u32,
     screen_height: u32,
@@ -24,10 +27,17 @@ pub struct Engine<G: GameLoop + 'static> {
     pub fps: u32,
 }
 
-impl<G: GameLoop> Engine<G> {
-    pub fn init(game: G, screen_width: u32, screen_height: u32, title: &str) -> Engine<G> {
-        Self {
+impl<D: Dimension> Engine<D> {
+    pub fn init<G: GameLoop<D> + 'static>(
+        game: G,
+        screen_width: u32,
+        screen_height: u32,
+        title: &str,
+    ) -> Engine<D, G> {
+        Engine {
             game,
+            scene: crate::scene::Scene::default(),
+            dimension: PhantomData,
             initialized: false,
             screen_width,
             screen_height,
@@ -39,7 +49,9 @@ impl<G: GameLoop> Engine<G> {
             fps: 60,
         }
     }
+}
 
+impl<D: Dimension, G: GameLoop<D> + 'static> Engine<D, G> {
     pub fn run(self) -> anyhow::Result<()> {
         let event_loop = EventLoop::new()?;
         event_loop.set_control_flow(ControlFlow::Wait);
@@ -62,11 +74,16 @@ impl<G: GameLoop> Engine<G> {
         };
 
         {
-            let mut ctx = EngineContext::new(state, &mut self.fps);
+            let mut ctx = EngineContext::<D>::new(state, &mut self.fps, &mut self.scene);
             self.game.update(&mut ctx, dt);
+        }
+        self.scene.update(dt);
+        {
+            let mut ctx = EngineContext::<D>::new(state, &mut self.fps, &mut self.scene);
             self.game.render(&mut ctx);
         }
 
+        state.sync_scene(&mut self.scene);
         state.update();
         match state.render() {
             Ok(()) => {}
@@ -81,7 +98,7 @@ impl<G: GameLoop> Engine<G> {
     }
 }
 
-impl<G: GameLoop> ApplicationHandler for Engine<G> {
+impl<D: Dimension, G: GameLoop<D> + 'static> ApplicationHandler for Engine<D, G> {
     fn can_create_surfaces(&mut self, event_loop: &dyn ActiveEventLoop) {
         let mut window_attributes = WindowAttributes::default();
         window_attributes.surface_size = Some(Size::Physical(PhysicalSize {
@@ -93,11 +110,11 @@ impl<G: GameLoop> ApplicationHandler for Engine<G> {
         let window: Arc<dyn Window> =
             Arc::from(event_loop.create_window(window_attributes).unwrap());
 
-        let mut state =
-            pollster::block_on(State::new(window.clone())).expect("Failed to create State");
+        let mut state = pollster::block_on(State::new_with_mode(window.clone(), D::MODE))
+            .expect("Failed to create State");
 
         if !self.initialized {
-            let mut ctx = EngineContext::new(&mut state, &mut self.fps);
+            let mut ctx = EngineContext::<D>::new(&mut state, &mut self.fps, &mut self.scene);
             self.game.startup(&mut ctx);
             self.initialized = true;
         }
@@ -178,8 +195,9 @@ impl<G: GameLoop> ApplicationHandler for Engine<G> {
             _ => {}
         }
 
-        let mut ctx = EngineContext::new(state, &mut self.fps);
+        let mut ctx = EngineContext::<D>::new(state, &mut self.fps, &mut self.scene);
         self.game.event(&mut ctx, &event);
+        self.scene.event(&event);
     }
 
     fn about_to_wait(&mut self, event_loop: &dyn ActiveEventLoop) {
@@ -202,12 +220,12 @@ impl<G: GameLoop> ApplicationHandler for Engine<G> {
     }
 }
 
-pub trait GameLoop {
-    fn startup(&mut self, _ctx: &mut EngineContext) {}
+pub trait GameLoop<D: Dimension = TwoD> {
+    fn startup(&mut self, _ctx: &mut EngineContext<D>) {}
 
-    fn event(&mut self, _ctx: &mut EngineContext, _event: &WindowEvent) {}
+    fn event(&mut self, _ctx: &mut EngineContext<D>, _event: &WindowEvent) {}
 
-    fn update(&mut self, _ctx: &mut EngineContext, _dt: f32) {}
+    fn update(&mut self, _ctx: &mut EngineContext<D>, _dt: f32) {}
 
-    fn render(&mut self, _ctx: &mut EngineContext) {}
+    fn render(&mut self, _ctx: &mut EngineContext<D>) {}
 }

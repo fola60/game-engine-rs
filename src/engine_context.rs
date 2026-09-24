@@ -1,32 +1,36 @@
 use crate::{
-    Color, Gesture, Mode, Point2D, Transform, Z,
-    camera::Camera,
-    entity::Entity,
-    renderer::{EntityType, VertexIndicie},
-    resources,
-    state::State,
-    world_units,
+    Color, Dimension, Gesture, Point2D, ThreeD, Transform, TwoD, Z, camera::Camera,
+    render_object::RenderObject, resources, state::State,
 };
 use cgmath::{Point3, Quaternion, Vector3};
-use std::collections::{HashMap, HashSet};
+use std::{
+    collections::{HashMap, HashSet},
+    marker::PhantomData,
+};
 
-pub struct EngineContext<'a> {
-    pub(crate) entities: &'a mut HashMap<u32, Entity>,
-    pub(crate) entity_ids: &'a mut HashSet<u32>,
+pub struct EngineContext<'a, D: Dimension> {
+    pub scene: &'a mut crate::scene::Scene<D>,
+    pub(crate) entities: &'a mut HashMap<String, RenderObject>,
+    pub(crate) entity_ids: &'a mut HashSet<String>,
     pub(crate) device: &'a wgpu::Device,
     pub(crate) queue: &'a wgpu::Queue,
     pub(crate) texture_bind_group_layout: &'a wgpu::BindGroupLayout,
     pub(crate) camera: &'a mut Camera,
     pub(crate) background: &'a mut Color,
-    pub(crate) mode: &'a mut Mode,
     pub(crate) text: &'a mut Vec<(String, f32, f32, u8)>,
     pub(crate) gesture: &'a mut Option<Gesture>,
     pub(crate) fps: &'a mut u32,
+    dimension: PhantomData<D>,
 }
 
-impl<'a> EngineContext<'a> {
-    pub(crate) fn new(state: &'a mut State, fps: &'a mut u32) -> Self {
+impl<'a, D: Dimension> EngineContext<'a, D> {
+    pub(crate) fn new(
+        state: &'a mut State,
+        fps: &'a mut u32,
+        scene: &'a mut crate::scene::Scene<D>,
+    ) -> Self {
         Self {
+            scene,
             entities: &mut state.entities,
             entity_ids: &mut state.entity_ids,
             device: &state.device,
@@ -34,11 +38,25 @@ impl<'a> EngineContext<'a> {
             texture_bind_group_layout: &state.texture_bind_group_layout,
             camera: &mut state.camera,
             background: &mut state.background,
-            mode: &mut state.mode,
             text: &mut state.text,
             gesture: &mut state.gesture,
             fps,
+            dimension: PhantomData,
         }
+    }
+
+    /// Register an entity for automatic lifecycle callbacks and drawing.
+    /// IDs in the scene are independent of the legacy immediate drawing API.
+    pub fn spawn<E: crate::Entity<D>>(&mut self, id: impl Into<String>, entity: E) -> bool {
+        self.scene.spawn(id, entity)
+    }
+
+    pub fn despawn(&mut self, id: &str) -> bool {
+        self.scene.despawn(id)
+    }
+
+    pub fn entity_mut<E: crate::Entity<D>>(&mut self, id: &str) -> Option<&mut E> {
+        self.scene.get_mut(id)
     }
 
     pub fn get_gesture(&self) -> Option<Gesture> {
@@ -53,7 +71,7 @@ impl<'a> EngineContext<'a> {
         *self.background = color;
     }
 
-    pub fn draw_circle(&mut self, id: u32, position: &Point2D, color: Color) -> bool {
+    pub fn draw_circle(&mut self, id: &str, position: &Point2D, color: Color) -> bool {
         self.set_location(
             id,
             Vector3 {
@@ -63,81 +81,36 @@ impl<'a> EngineContext<'a> {
             },
         );
         self.set_color(id, color);
-        self.entity_ids.insert(id)
+        self.entity_ids.insert(id.to_owned())
     }
 
-    pub fn draw_cube(&mut self, id: u32, position: Vector3<f32>, color: Color) -> bool {
+    pub fn draw_cube(&mut self, id: &str, position: Vector3<f32>, color: Color) -> bool {
         self.set_location(id, position);
         self.set_color(id, color);
-        self.entity_ids.insert(id)
+        self.entity_ids.insert(id.to_owned())
     }
 
-    pub fn add_circle(&mut self, id: u32, radius: f32) {
-        let segments = 32; // increase for smoother circle
-        let radius = world_units::meters_to_world(radius);
-
-        let mut vertices = vec![];
-        let mut indices = vec![];
-
-        // center vertex
-        vertices.push(crate::model::ModelVertex {
-            position: [0.0, 0.0, Z],
-            tex_coords: [0.5, 0.5],
-            normal: [0.0, 0.0, 0.0],
-        });
-
-        // outer ring
-        for i in 0..=segments {
-            let angle = (i as f32 / segments as f32) * std::f32::consts::TAU;
-            let x = radius * angle.cos();
-            let y = radius * angle.sin();
-
-            vertices.push(crate::model::ModelVertex {
-                position: [x, y, Z],
-                tex_coords: [0.0, 0.0],
-                normal: [0.0, 0.0, 0.0],
-            });
-        }
-
-        // indices (triangle fan)
-        for i in 1..=segments {
-            indices.push(0);
-            indices.push(i as u16);
-            indices.push((i + 1) as u16);
-        }
-
-        let data = VertexIndicie {
-            vertexes: vertices,
-            indicies: indices,
-        };
-
+    pub fn add_circle(&mut self, id: &str, radius: f32) {
+        let mesh = crate::Mesh::<TwoD>::circle(radius);
         self.entities.insert(
-            id,
-            Entity::new(
-                id,
-                data,
+            id.to_owned(),
+            RenderObject::new(
+                id.to_owned(),
+                (*mesh.data).clone(),
                 1,
-                Vector3 {
-                    x: 0.0,
-                    y: 0.0,
-                    z: Z,
-                },
+                Vector3::new(0.0, 0.0, Z),
                 self.device,
             ),
         );
     }
 
-    pub fn set_mode(&mut self, mode: Mode) {
-        *self.mode = mode;
-    }
-
-    pub fn draw_entity(&mut self, id: u32, location: Vector3<f32>) {
+    pub fn draw_entity(&mut self, id: &str, location: Vector3<f32>) {
         self.set_location(id, location);
-        self.entity_ids.insert(id);
+        self.entity_ids.insert(id.to_owned());
     }
 
-    pub fn add_entity(&mut self, id: u32) -> bool {
-        self.entity_ids.insert(id)
+    pub fn add_entity(&mut self, id: &str) -> bool {
+        self.entity_ids.insert(id.to_owned())
     }
 
     pub fn set_camera_eye(&mut self, eye: Point3<f32>) {
@@ -156,7 +129,7 @@ impl<'a> EngineContext<'a> {
         self.camera.target
     }
 
-    pub fn draw_rectangle(&mut self, id: u32, location: &Point2D, color: Color) -> bool {
+    pub fn draw_rectangle(&mut self, id: &str, location: &Point2D, color: Color) -> bool {
         self.set_location(
             id,
             Vector3 {
@@ -166,231 +139,46 @@ impl<'a> EngineContext<'a> {
             },
         );
         self.set_color(id, color);
-        self.entity_ids.insert(id)
+        self.entity_ids.insert(id.to_owned())
     }
 
-    pub fn add_rectangle(&mut self, id: u32, width: f32, height: f32) {
-        let width = world_units::meters_to_world(width);
-        let height = world_units::meters_to_world(height);
-
-        let top_left = crate::model::ModelVertex {
-            position: [0.0, 0.0, Z],
-            tex_coords: [0.0, 1.0],
-            normal: [0.0, 0.0, 0.0],
-        };
-
-        let top_right = crate::model::ModelVertex {
-            position: [width, 0.0, Z],
-            tex_coords: [1.0, 1.0],
-            normal: [0.0, 0.0, 0.0],
-        };
-
-        let bottom_left = crate::model::ModelVertex {
-            position: [0.0, 0.0 - height, Z],
-            tex_coords: [0.0, 0.0],
-            normal: [0.0, 0.0, 0.0],
-        };
-
-        let bottom_right = crate::model::ModelVertex {
-            position: [width, 0.0 - height, Z],
-            tex_coords: [1.0, 0.0],
-            normal: [0.0, 0.0, 0.0],
-        };
-
-        let entity_vertex_data = VertexIndicie {
-            vertexes: vec![top_left, top_right, bottom_left, bottom_right],
-            indicies: vec![0, 2, 1, 2, 3, 1],
-        };
-
+    pub fn add_rectangle(&mut self, id: &str, width: f32, height: f32) {
+        let mesh = crate::Mesh::<TwoD>::rectangle(width, height);
         self.entities.insert(
-            id,
-            Entity::new(
-                id,
-                entity_vertex_data,
+            id.to_owned(),
+            RenderObject::new(
+                id.to_owned(),
+                (*mesh.data).clone(),
                 1,
-                Vector3 {
-                    x: 0.0,
-                    y: 0.0,
-                    z: Z,
-                },
+                Vector3::new(0.0, 0.0, Z),
                 self.device,
             ),
         );
     }
 
-    pub fn add_cube(&mut self, id: u32, width: f32, height: f32, length: f32) {
-        let half_w = world_units::meters_to_world(width) * 0.5;
-        let half_h = world_units::meters_to_world(height) * 0.5;
-        let half_l = world_units::meters_to_world(length) * 0.5;
-
-        let vertices = vec![
-            // Front (+Z)
-            crate::model::ModelVertex {
-                position: [-half_w, -half_h, half_l],
-                tex_coords: [0.0, 1.0],
-                normal: [0.0, 0.0, 1.0],
-            },
-            crate::model::ModelVertex {
-                position: [half_w, -half_h, half_l],
-                tex_coords: [1.0, 1.0],
-                normal: [0.0, 0.0, 1.0],
-            },
-            crate::model::ModelVertex {
-                position: [half_w, half_h, half_l],
-                tex_coords: [1.0, 0.0],
-                normal: [0.0, 0.0, 1.0],
-            },
-            crate::model::ModelVertex {
-                position: [-half_w, half_h, half_l],
-                tex_coords: [0.0, 0.0],
-                normal: [0.0, 0.0, 1.0],
-            },
-            // Back (-Z)
-            crate::model::ModelVertex {
-                position: [half_w, -half_h, -half_l],
-                tex_coords: [0.0, 1.0],
-                normal: [0.0, 0.0, -1.0],
-            },
-            crate::model::ModelVertex {
-                position: [-half_w, -half_h, -half_l],
-                tex_coords: [1.0, 1.0],
-                normal: [0.0, 0.0, -1.0],
-            },
-            crate::model::ModelVertex {
-                position: [-half_w, half_h, -half_l],
-                tex_coords: [1.0, 0.0],
-                normal: [0.0, 0.0, -1.0],
-            },
-            crate::model::ModelVertex {
-                position: [half_w, half_h, -half_l],
-                tex_coords: [0.0, 0.0],
-                normal: [0.0, 0.0, -1.0],
-            },
-            // Left (-X)
-            crate::model::ModelVertex {
-                position: [-half_w, -half_h, -half_l],
-                tex_coords: [0.0, 1.0],
-                normal: [-1.0, 0.0, 0.0],
-            },
-            crate::model::ModelVertex {
-                position: [-half_w, -half_h, half_l],
-                tex_coords: [1.0, 1.0],
-                normal: [-1.0, 0.0, 0.0],
-            },
-            crate::model::ModelVertex {
-                position: [-half_w, half_h, half_l],
-                tex_coords: [1.0, 0.0],
-                normal: [-1.0, 0.0, 0.0],
-            },
-            crate::model::ModelVertex {
-                position: [-half_w, half_h, -half_l],
-                tex_coords: [0.0, 0.0],
-                normal: [-1.0, 0.0, 0.0],
-            },
-            // Right (+X)
-            crate::model::ModelVertex {
-                position: [half_w, -half_h, half_l],
-                tex_coords: [0.0, 1.0],
-                normal: [1.0, 0.0, 0.0],
-            },
-            crate::model::ModelVertex {
-                position: [half_w, -half_h, -half_l],
-                tex_coords: [1.0, 1.0],
-                normal: [1.0, 0.0, 0.0],
-            },
-            crate::model::ModelVertex {
-                position: [half_w, half_h, -half_l],
-                tex_coords: [1.0, 0.0],
-                normal: [1.0, 0.0, 0.0],
-            },
-            crate::model::ModelVertex {
-                position: [half_w, half_h, half_l],
-                tex_coords: [0.0, 0.0],
-                normal: [1.0, 0.0, 0.0],
-            },
-            // Top (+Y)
-            crate::model::ModelVertex {
-                position: [-half_w, half_h, half_l],
-                tex_coords: [0.0, 1.0],
-                normal: [0.0, 1.0, 0.0],
-            },
-            crate::model::ModelVertex {
-                position: [half_w, half_h, half_l],
-                tex_coords: [1.0, 1.0],
-                normal: [0.0, 1.0, 0.0],
-            },
-            crate::model::ModelVertex {
-                position: [half_w, half_h, -half_l],
-                tex_coords: [1.0, 0.0],
-                normal: [0.0, 1.0, 0.0],
-            },
-            crate::model::ModelVertex {
-                position: [-half_w, half_h, -half_l],
-                tex_coords: [0.0, 0.0],
-                normal: [0.0, 1.0, 0.0],
-            },
-            // Bottom (-Y)
-            crate::model::ModelVertex {
-                position: [-half_w, -half_h, -half_l],
-                tex_coords: [0.0, 1.0],
-                normal: [0.0, -1.0, 0.0],
-            },
-            crate::model::ModelVertex {
-                position: [half_w, -half_h, -half_l],
-                tex_coords: [1.0, 1.0],
-                normal: [0.0, -1.0, 0.0],
-            },
-            crate::model::ModelVertex {
-                position: [half_w, -half_h, half_l],
-                tex_coords: [1.0, 0.0],
-                normal: [0.0, -1.0, 0.0],
-            },
-            crate::model::ModelVertex {
-                position: [-half_w, -half_h, half_l],
-                tex_coords: [0.0, 0.0],
-                normal: [0.0, -1.0, 0.0],
-            },
-        ];
-
-        let indicies: Vec<u16> = vec![
-            0, 1, 2, 0, 2, 3, // front
-            4, 5, 6, 4, 6, 7, // back
-            8, 9, 10, 8, 10, 11, // left
-            12, 13, 14, 12, 14, 15, // right
-            16, 17, 18, 16, 18, 19, // top
-            20, 21, 22, 20, 22, 23, // bottom
-        ];
-
-        let entity_vertex_data = VertexIndicie {
-            vertexes: vertices,
-            indicies,
-        };
-
+    pub fn add_cube(&mut self, id: &str, width: f32, height: f32, length: f32) {
+        let mesh = crate::Mesh::<ThreeD>::cube(width, height, length);
         self.entities.insert(
-            id,
-            Entity::new(
-                id,
-                entity_vertex_data,
+            id.to_owned(),
+            RenderObject::new(
+                id.to_owned(),
+                (*mesh.data).clone(),
                 1,
-                Vector3 {
-                    x: 0.0,
-                    y: 0.0,
-                    z: Z,
-                },
+                Vector3::new(0.0, 0.0, Z),
                 self.device,
             ),
         );
     }
 
-    pub fn add_entity_from_model(&mut self, id: u32, model_path: &str) -> anyhow::Result<()> {
+    pub fn add_entity_from_model(&mut self, id: &str, model_path: &str) -> anyhow::Result<()> {
         let model = resources::load_model(
             model_path,
             self.device,
             self.queue,
             self.texture_bind_group_layout,
         )?;
-        let entity = Entity::from_model(
-            id,
+        let entity = RenderObject::from_model(
+            id.to_owned(),
             model,
             Vector3 {
                 x: 0.0,
@@ -400,7 +188,7 @@ impl<'a> EngineContext<'a> {
             self.device,
         );
 
-        self.entities.insert(id, entity);
+        self.entities.insert(id.to_owned(), entity);
         Ok(())
     }
 
@@ -410,12 +198,12 @@ impl<'a> EngineContext<'a> {
             .push((String::from(text), location.x, location.y, font_size));
     }
 
-    pub fn get_transform(&self, id: u32) -> Option<Transform> {
-        self.entities.get(&id).map(|entity| entity.transform)
+    pub fn get_transform(&self, id: &str) -> Option<Transform> {
+        self.entities.get(id).map(|entity| entity.transform)
     }
 
-    pub fn set_transform(&mut self, id: u32, transform: Transform) -> bool {
-        if let Some(entity) = self.entities.get_mut(&id) {
+    pub fn set_transform(&mut self, id: &str, transform: Transform) -> bool {
+        if let Some(entity) = self.entities.get_mut(id) {
             entity.transform = transform;
             entity.instance_dirty = true;
             true
@@ -424,18 +212,18 @@ impl<'a> EngineContext<'a> {
         }
     }
 
-    pub fn get_location(&self, id: u32) -> Option<Vector3<f32>> {
+    pub fn get_location(&self, id: &str) -> Option<Vector3<f32>> {
         self.entities
-            .get(&id)
+            .get(id)
             .map(|entity| entity.transform.position)
     }
 
-    pub fn set_location(&mut self, id: u32, location: Vector3<f32>) -> bool {
+    pub fn set_location(&mut self, id: &str, location: Vector3<f32>) -> bool {
         self.set_position(id, location)
     }
 
-    pub fn set_position(&mut self, id: u32, position: Vector3<f32>) -> bool {
-        if let Some(entity) = self.entities.get_mut(&id) {
+    pub fn set_position(&mut self, id: &str, position: Vector3<f32>) -> bool {
+        if let Some(entity) = self.entities.get_mut(id) {
             entity.transform.position = position;
             entity.instance_dirty = true;
             true
@@ -444,8 +232,8 @@ impl<'a> EngineContext<'a> {
         }
     }
 
-    pub fn set_rotation(&mut self, id: u32, rotation: Quaternion<f32>) -> bool {
-        if let Some(entity) = self.entities.get_mut(&id) {
+    pub fn set_rotation(&mut self, id: &str, rotation: Quaternion<f32>) -> bool {
+        if let Some(entity) = self.entities.get_mut(id) {
             entity.transform.rotation = rotation;
             entity.instance_dirty = true;
             true
@@ -454,8 +242,8 @@ impl<'a> EngineContext<'a> {
         }
     }
 
-    pub fn set_scale(&mut self, id: u32, scale: Vector3<f32>) -> bool {
-        if let Some(entity) = self.entities.get_mut(&id) {
+    pub fn set_scale(&mut self, id: &str, scale: Vector3<f32>) -> bool {
+        if let Some(entity) = self.entities.get_mut(id) {
             entity.transform.scale = scale;
             entity.instance_dirty = true;
             true
@@ -464,8 +252,8 @@ impl<'a> EngineContext<'a> {
         }
     }
 
-    pub fn set_color(&mut self, id: u32, color: Color) -> bool {
-        if let Some(entity) = self.entities.get_mut(&id) {
+    pub fn set_color(&mut self, id: &str, color: Color) -> bool {
+        if let Some(entity) = self.entities.get_mut(id) {
             entity.color = color.to_rgba();
             entity.instance_dirty = true;
             true
@@ -476,5 +264,21 @@ impl<'a> EngineContext<'a> {
 
     pub fn set_target_fps(&mut self, fps: u32) {
         *self.fps = fps.max(1);
+    }
+}
+
+impl EngineContext<'_, TwoD> {
+    pub fn draw(&mut self, id: &str, location: &Point2D, color: Color) -> bool {
+        self.set_location(id, Vector3::new(location.x, location.y, Z));
+        self.set_color(id, color);
+        self.entity_ids.insert(id.to_owned())
+    }
+}
+
+impl EngineContext<'_, ThreeD> {
+    pub fn draw(&mut self, id: &str, location: &Vector3<f32>, color: Color) -> bool {
+        self.set_location(id, *location);
+        self.set_color(id, color);
+        self.entity_ids.insert(id.to_owned())
     }
 }

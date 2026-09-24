@@ -1,3 +1,7 @@
+//! Run with `cargo run --example paddle_game`.
+//! Move with A/D or the arrow keys, reset the ball with R, and quit with Escape.
+//! Swipe left/right to move, up to reset the ball, or down to center the paddle.
+
 use game_engine_rs::{
     Circle, Color, Gesture, Point2D, Rectangle, TwoD,
     engine::{Engine, GameLoop},

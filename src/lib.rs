@@ -1,5 +1,3 @@
-use cgmath::prelude::*;
-
 pub mod app_window;
 pub mod engine;
 pub mod state;
@@ -7,6 +5,9 @@ pub mod texture;
 pub mod camera;
 pub mod renderer;
 pub mod entity;
+pub mod geometry;
+pub mod scene;
+pub mod render_object;
 pub mod engine_context;
 pub mod model;
 pub mod resources;
@@ -16,6 +17,8 @@ pub mod transform;
 pub mod world_units;
 
 pub use transform::Transform;
+pub use entity::{Entity, EntityContext, RenderData, Circle, Rectangle, Cube};
+pub use geometry::Mesh;
 
 // Draw a 2d circle 
 
@@ -37,6 +40,7 @@ impl Default for Point2D {
     }
 }
 
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Color {
     Red,
     LightRed,
@@ -195,9 +199,30 @@ struct Size {
     height: u32
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum Mode {
     Mode2D,
     Mode3D
+}
+
+/// Marker trait used to select the engine's dimensionality at compile time.
+pub trait Dimension: 'static {
+    #[doc(hidden)]
+    const MODE: Mode;
+}
+
+/// Compile-time marker for a two-dimensional engine.
+pub struct TwoD;
+
+/// Compile-time marker for a three-dimensional engine.
+pub struct ThreeD;
+
+impl Dimension for TwoD {
+    const MODE: Mode = Mode::Mode2D;
+}
+
+impl Dimension for ThreeD {
+    const MODE: Mode = Mode::Mode3D;
 }
 
 
@@ -205,9 +230,30 @@ pub enum Mode {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::engine::{Engine, GameLoop};
+    use crate::engine_context::EngineContext;
+    use cgmath::Vector3;
+
+    struct TestGame;
+
+    impl GameLoop<TwoD> for TestGame {}
+    impl GameLoop<ThreeD> for TestGame {}
 
     #[test]
-    fn it_works() {
+    fn dimensions_select_the_expected_rendering_mode() {
+        assert_eq!(TwoD::MODE, Mode::Mode2D);
+        assert_eq!(ThreeD::MODE, Mode::Mode3D);
 
+        let _two_d_engine = Engine::<TwoD>::init(TestGame, 800, 600, "2D");
+        let _three_d_engine = Engine::<ThreeD>::init(TestGame, 800, 600, "3D");
+    }
+
+    #[allow(dead_code)]
+    fn dimension_specific_draw_signatures_compile(
+        two_d: &mut EngineContext<TwoD>,
+        three_d: &mut EngineContext<ThreeD>,
+    ) {
+        two_d.draw("sprite", &Point2D::default(), Color::White);
+        three_d.draw("model", &Vector3::new(0.0, 0.0, 0.0), Color::White);
     }
 }

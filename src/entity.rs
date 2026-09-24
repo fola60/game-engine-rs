@@ -1,216 +1,107 @@
-use crate::{
-    Instance, InstanceRaw, Transform,
-    model::Model,
-    renderer::{EntityType, VertexIndicie},
-    texture::Texture,
-};
-use cgmath::{InnerSpace, Rotation3, Zero};
-use image::GenericImageView;
-use wgpu::util::DeviceExt;
+//! User-defined scene entities and built-in shapes.
+use crate::scene::Command;
+use crate::{Color, Dimension, Mesh, ThreeD, Transform, TwoD};
+use winit::event::WindowEvent;
 
-pub struct Entity {
-    pub(crate) id: u32,
-    pub(crate) vertex_data: VertexIndicie,
-    pub(crate) vertex_buffer: wgpu::Buffer,
-    pub(crate) index_buffer: wgpu::Buffer,
-    pub(crate) instance_buffer: wgpu::Buffer,
-    pub(crate) num_instances: u32,
-    pub(crate) instance_displacement: cgmath::Vector3<f32>,
-    pub(crate) diffuse_texture_name: Option<String>,
-    pub(crate) texture: Option<Texture>,
-    pub(crate) model: Option<Model>,
-    pub(crate) transform: Transform,
-    pub(crate) color: [f32; 4],
-    pub(crate) instance_dirty: bool,
+/// Implement this trait to register a user-owned type with the engine.
+/// Hooks run on the engine thread. Each registration receives start, then ready,
+/// once before its first update. Invisible entities continue updating.
+///
+/// ```compile_fail
+/// use game_engine_rs::{Cube, TwoD, engine_context::EngineContext};
+/// fn wrong_dimension(ctx: &mut EngineContext<TwoD>) {
+///     ctx.spawn("cube", Cube::new(1.0, 1.0, 1.0));
+/// }
+/// ```
+pub trait Entity<D: Dimension>: std::any::Any {
+    fn start(&mut self, _ctx: &mut EntityContext<D>) {}
+    fn ready(&mut self, _ctx: &mut EntityContext<D>) {}
+    fn event(&mut self, _ctx: &mut EntityContext<D>, _event: &WindowEvent) {}
+    fn update(&mut self, _ctx: &mut EntityContext<D>, _dt: f32) {}
+
+    /// Return a cheap mesh clone plus current appearance, or None to hide.
+    /// The engine caches GPU geometry until the mesh identity changes.
+    fn render_data(&self) -> Option<RenderData<D>>;
 }
 
-impl Entity {
-    fn build_vertex_buffer(device: &wgpu::Device, vertex_data: &VertexIndicie) -> wgpu::Buffer {
-        device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("Vertex Buffer"),
-            contents: bytemuck::cast_slice(&vertex_data.vertexes),
-            usage: wgpu::BufferUsages::VERTEX,
-        })
+/// Rendering description independent of GPU resources.
+/// Transform uses the engine's existing world-space representation in both modes.
+pub struct RenderData<D: Dimension> {
+    pub mesh: Mesh<D>,
+    pub transform: Transform,
+    pub color: Color,
+}
+
+impl<D: Dimension> RenderData<D> {
+    pub fn new(mesh: Mesh<D>) -> Self {
+        Self {
+            mesh,
+            transform: Transform::default(),
+            color: Color::White,
+        }
+    }
+}
+
+/// Commands requested during hooks are processed in order at the next frame.
+/// Spawn uses unique string IDs; a queued duplicate is ignored without replacing
+/// the existing entity. Despawn followed by spawn explicitly replaces an entity.
+pub struct EntityContext<'a, D: Dimension> {
+    pub(crate) id: &'a str,
+    pub(crate) commands: &'a mut Vec<Command<D>>,
+}
+
+impl<D: Dimension> EntityContext<'_, D> {
+    pub fn id(&self) -> &str {
+        self.id
     }
 
-    fn build_index_buffer(device: &wgpu::Device, vertex_data: &VertexIndicie) -> wgpu::Buffer {
-        device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("Index Buffer"),
-            contents: bytemuck::cast_slice(&vertex_data.indicies),
-            usage: wgpu::BufferUsages::INDEX,
-        })
+    pub fn spawn<E: Entity<D>>(&mut self, id: impl Into<String>, entity: E) {
+        self.commands
+            .push(Command::Spawn(id.into(), Box::new(entity)));
     }
 
-    fn build_instances(
-        num_instances: u32,
-        instance_displacement: cgmath::Vector3<f32>,
-        transform: Transform,
-        color: [f32; 4],
-    ) -> Vec<InstanceRaw> {
-        (0..num_instances)
-            .flat_map(|z| {
-                (0..num_instances).map(move |x| {
-                    let position = cgmath::Vector3 {
-                        x: x as f32,
-                        y: 0.0,
-                        z: z as f32,
-                    } - instance_displacement;
+    pub fn despawn(&mut self, id: impl Into<String>) {
+        self.commands.push(Command::Despawn(id.into()));
+    }
 
-                    let rotation = if position.is_zero() {
-                        // this is needed so an object at (0, 0, 0) won't get scaled to zero
-                        // as Quaternions can affect scale if they're not created correctly
-                        cgmath::Quaternion::from_axis_angle(
-                            cgmath::Vector3::unit_z(),
-                            cgmath::Deg(0.0),
-                        )
-                    } else {
-                        cgmath::Quaternion::from_axis_angle(position.normalize(), cgmath::Deg(45.0))
-                    };
+    pub fn despawn_self(&mut self) {
+        self.despawn(self.id.to_owned());
+    }
+}
 
-                    Instance {
-                        model: transform.matrix()
-                            * cgmath::Matrix4::from_translation(position)
-                            * cgmath::Matrix4::from(rotation),
-                        color: color.into(),
-                    }
-                    .to_raw()
+macro_rules! shape {
+    ($name:ident, $dimension:ty, $constructor:ident, $($arg:ident),+) => {
+        pub struct $name {
+            mesh: Mesh<$dimension>,
+            pub transform: Transform,
+            pub color: Color,
+            pub visible: bool,
+        }
+
+        impl $name {
+            /// Shape dimensions are in meters.
+            pub fn new($($arg: f32),+) -> Self {
+                Self {
+                    mesh: Mesh::<$dimension>::$constructor($($arg),+),
+                    transform: Transform::default(),
+                    color: Color::White,
+                    visible: true,
+                }
+            }
+        }
+
+        impl Entity<$dimension> for $name {
+            fn render_data(&self) -> Option<RenderData<$dimension>> {
+                self.visible.then(|| RenderData {
+                    mesh: self.mesh.clone(),
+                    transform: self.transform,
+                    color: self.color,
                 })
-            })
-            .collect()
-    }
-
-    fn build_instance_buffer(
-        device: &wgpu::Device,
-        num_instances: u32,
-        instance_displacement: cgmath::Vector3<f32>,
-        transform: Transform,
-        color: [f32; 4],
-    ) -> wgpu::Buffer {
-        let instances =
-            Self::build_instances(num_instances, instance_displacement, transform, color);
-        device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("Instance Buffer"),
-            contents: bytemuck::cast_slice(&instances),
-            usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
-        })
-    }
-
-    pub(crate) fn sync_instance_buffer(&mut self, queue: &wgpu::Queue) {
-        if !self.instance_dirty {
-            return;
+            }
         }
-
-        let instances = Self::build_instances(
-            self.num_instances,
-            self.instance_displacement,
-            self.transform,
-            self.color,
-        );
-        queue.write_buffer(&self.instance_buffer, 0, bytemuck::cast_slice(&instances));
-        self.instance_dirty = false;
-    }
-
-    pub fn set_material_color(&self, queue: &mut wgpu::Queue, material_buffer: &mut wgpu::Buffer) {
-        queue.write_buffer(material_buffer, 0, bytemuck::cast_slice(&[self.color]));
-    }
-
-    pub fn set_diffuse(&self, queue: &wgpu::Queue, device: &wgpu::Device) {
-        let diffuse_bytes = include_bytes!("../assets/happy-tree.png");
-        let img = image::load_from_memory(diffuse_bytes).unwrap();
-        let rgba = img.to_rgba8();
-        let dimensions = img.dimensions();
-
-        let size = wgpu::Extent3d {
-            width: dimensions.0,
-            height: dimensions.1,
-            depth_or_array_layers: 1,
-        };
-
-        let texture = device.create_texture(&wgpu::TextureDescriptor {
-            label: Some("bluh"),
-            size,
-            mip_level_count: 1,
-            sample_count: 1,
-            dimension: wgpu::TextureDimension::D2,
-            format: wgpu::TextureFormat::Rgba8UnormSrgb,
-            usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
-            view_formats: &[],
-        });
-
-        queue.write_texture(
-            wgpu::TexelCopyTextureInfo {
-                aspect: wgpu::TextureAspect::All,
-                texture: &texture,
-                mip_level: 0,
-                origin: wgpu::Origin3d::ZERO,
-            },
-            &rgba,
-            wgpu::TexelCopyBufferLayout {
-                offset: 0,
-                bytes_per_row: Some(4 * dimensions.0),
-                rows_per_image: Some(dimensions.1),
-            },
-            wgpu::Extent3d {
-                width: dimensions.0,
-                height: dimensions.1,
-                depth_or_array_layers: 1,
-            },
-        );
-    }
-
-    pub(crate) fn new(
-        id: u32,
-        vertex_data: VertexIndicie,
-        num_instances_per_row: u32,
-        instance_displacement: cgmath::Vector3<f32>,
-        device: &wgpu::Device,
-    ) -> Entity {
-        let transform = Transform::default();
-        let color = [1.0, 1.0, 1.0, 1.0];
-        let vertex_buffer = Self::build_vertex_buffer(device, &vertex_data);
-        let index_buffer = Self::build_index_buffer(device, &vertex_data);
-        let instance_buffer = Self::build_instance_buffer(
-            device,
-            num_instances_per_row,
-            instance_displacement,
-            transform,
-            color,
-        );
-
-        Entity {
-            id,
-            vertex_data,
-            vertex_buffer,
-            index_buffer,
-            instance_buffer,
-            num_instances: num_instances_per_row,
-            instance_displacement,
-            diffuse_texture_name: None,
-            texture: None,
-            model: None,
-            transform,
-            color,
-            instance_dirty: false,
-        }
-    }
-
-    pub(crate) fn from_model(
-        id: u32,
-        model: Model,
-        instance_displacement: cgmath::Vector3<f32>,
-        device: &wgpu::Device,
-    ) -> Entity {
-        let vertex_data = VertexIndicie {
-            vertexes: vec![crate::model::ModelVertex {
-                position: [0.0, 0.0, 0.0],
-                tex_coords: [0.0, 0.0],
-                normal: [0.0, 0.0, 0.0],
-            }],
-            indicies: vec![0],
-        };
-
-        let mut entity = Self::new(id, vertex_data, 1, instance_displacement, device);
-        entity.model = Some(model);
-        entity
-    }
+    };
 }
+
+shape!(Circle, TwoD, circle, radius);
+shape!(Rectangle, TwoD, rectangle, width, height);
+shape!(Cube, ThreeD, cube, width, height, length);

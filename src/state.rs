@@ -1,12 +1,12 @@
 use std::{collections::{HashMap, HashSet}, sync::Arc};
-use winit::{dpi::PhysicalPosition, event::PointerSource, event_loop::ActiveEventLoop, keyboard::KeyCode, window::Window};
+use winit::{event_loop::ActiveEventLoop, keyboard::KeyCode, window::Window};
 use wgpu::util::DeviceExt;
 use crate::{
     camera::{Camera, CameraController, CameraUniform},
-    entity::{self, Entity},
+    render_object::RenderObject,
     gesture::SwipeTracker,
     model::{DrawModel, ModelVertex, Vertex},
-    renderer::{EntityType, Renderer},
+    renderer::Renderer,
     text::TextRenderer,
     texture::Texture,
     Color, Gesture, InstanceRaw, Mode, Point2D,
@@ -42,13 +42,55 @@ pub struct State {
     pub gesture: Option<Gesture>,
     pub swipe_tracker: SwipeTracker,
     pub pointer_position: Point2D,
-    pub entities: HashMap<u32, Entity>,
-    pub entity_ids: HashSet<u32>,
+    pub entities: HashMap<String, RenderObject>,
+    pub entity_ids: HashSet<String>,
+    pub(crate) scene_objects: HashMap<String, RenderObject>,
 }
 
 
 impl State {
+    /// Copy entity descriptions to cached GPU objects after the game finishes updating.
+    pub(crate) fn sync_scene<D: crate::Dimension>(&mut self, scene: &mut crate::scene::Scene<D>) {
+        for id in scene.take_removed() {
+            self.scene_objects.remove(&id);
+        }
+        for (id, entity) in scene.renderables() {
+            let Some(data) = entity.render_data() else {
+                if let Some(object) = self.scene_objects.get_mut(id) {
+                    object.visible = false;
+                }
+                continue;
+            };
+            let changed = self.scene_objects.get(id)
+                .and_then(|object| object.source_mesh.as_ref())
+                .is_none_or(|mesh| !Arc::ptr_eq(mesh, &data.mesh.data));
+            if changed {
+                let mut object = RenderObject::new(
+                    id.to_owned(), (*data.mesh.data).clone(), 1,
+                    cgmath::Vector3::new(0.0, 0.0, 0.0), &self.device,
+                );
+                object.source_mesh = Some(data.mesh.data.clone());
+                self.scene_objects.insert(id.to_owned(), object);
+            }
+            let object = self.scene_objects.get_mut(id).expect("render object was created");
+            let color = data.color.to_rgba();
+            if object.transform != data.transform || object.color != color {
+                object.transform = data.transform;
+                object.color = color;
+                object.instance_dirty = true;
+            }
+            object.visible = true;
+        }
+    }
+
     pub async fn new(window: Arc<dyn Window>) -> anyhow::Result<State> {
+        Self::new_with_mode(window, Mode::Mode2D).await
+    }
+
+    pub(crate) async fn new_with_mode(
+        window: Arc<dyn Window>,
+        mode: Mode,
+    ) -> anyhow::Result<State> {
         let size = window.surface_size();
         // The instance is a handle to our GPU
         // BackendBit::PRIMARY => Vulkan + Metal + DX12 + Browser WebGPU
@@ -282,13 +324,14 @@ impl State {
             renderer: Renderer { entity_vertex_data: vec![], screen_width, screen_height},
             text_renderer,
             background: Color::White,
-            mode: Mode::Mode2D,
+            mode,
             text: vec![],
             gesture: None,
             swipe_tracker: SwipeTracker::new(),
             pointer_position: Point2D::default(),
             entities: HashMap::new(),
             entity_ids: HashSet::new(),
+            scene_objects: HashMap::new(),
         })
 
     }
@@ -321,7 +364,7 @@ impl State {
     }
 
     pub fn update(&mut self) {
-        for entity in self.entities.values_mut() {
+        for entity in self.entities.values_mut().chain(self.scene_objects.values_mut()) {
             entity.sync_instance_buffer(&self.queue);
         }
 
@@ -388,11 +431,8 @@ impl State {
             // render_pass.set_bind_group(0, &self.diffuse_bind_group, &[]); // index = group in shader.wgsl 
             // render_pass.set_bind_group(1, &self.camera_bind_group, &[]); // index = group in shader.wgsl
             
-            for id in &self.entity_ids {
-                let entity = match self.entities.get(id) {
-                    Some(e) => e,
-                    None => continue,
-                };
+            for entity in self.entity_ids.iter().filter_map(|id| self.entities.get(id))
+                .chain(self.scene_objects.values().filter(|object| object.visible)) {
 
                 if matches!(self.mode, Mode::Mode2D) && entity.model.is_some() {
                     continue;

@@ -7,6 +7,7 @@ pub enum EntityType {
     Model,
 }
 
+#[derive(Clone)]
 pub(crate) struct VertexIndicie {
     pub(crate) vertexes: Vec<ModelVertex>,
     pub(crate) indicies: Vec<u16>,
