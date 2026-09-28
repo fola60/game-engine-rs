@@ -20,6 +20,7 @@ pub struct EngineContext<'a, D: Dimension> {
     pub(crate) text: &'a mut Vec<(String, f32, f32, u8)>,
     pub(crate) gesture: &'a mut Option<Gesture>,
     pub(crate) fps: &'a mut u32,
+    keyboard: &'a crate::input::KeyboardState,
     dimension: PhantomData<D>,
 }
 
@@ -40,6 +41,7 @@ impl<'a, D: Dimension> EngineContext<'a, D> {
             background: &mut state.background,
             text: &mut state.text,
             gesture: &mut state.gesture,
+            keyboard: &state.keyboard,
             fps,
             dimension: PhantomData,
         }
@@ -57,6 +59,16 @@ impl<'a, D: Dimension> EngineContext<'a, D> {
 
     pub fn entity_mut<E: crate::Entity<D>>(&mut self, id: &str) -> Option<&mut E> {
         self.scene.get_mut(id)
+    }
+
+    pub fn key_down(&self, key: winit::keyboard::KeyCode) -> bool {
+        self.keyboard.key_down(key)
+    }
+
+    /// True for the frame following a press, even if released before the frame.
+    /// Repeated key events do not count as new presses.
+    pub fn key_pressed(&self, key: winit::keyboard::KeyCode) -> bool {
+        self.keyboard.key_pressed(key)
     }
 
     pub fn get_gesture(&self) -> Option<Gesture> {

@@ -1,6 +1,6 @@
 //! User-defined scene entities and built-in shapes.
 use crate::scene::Command;
-use crate::{Color, Dimension, Mesh, ThreeD, Transform, TwoD};
+use crate::{CollisionEvent, Color, Dimension, Mesh, ThreeD, Transform, TwoD};
 use winit::event::WindowEvent;
 
 /// Implement this trait to register a user-owned type with the engine.
@@ -19,8 +19,9 @@ pub trait Entity<D: Dimension>: std::any::Any {
     fn event(&mut self, _ctx: &mut EntityContext<D>, _event: &WindowEvent) {}
     fn update(&mut self, _ctx: &mut EntityContext<D>, _dt: f32) {}
 
-    /// Return a cheap mesh clone plus current appearance, or None to hide.
-    /// The engine caches GPU geometry until the mesh identity changes.
+    /// Called on both entities after detection. Commands take effect next update.
+    fn on_collision(&mut self, _ctx: &mut EntityContext<D>, _event: &CollisionEvent) {}
+
     fn render_data(&self) -> Option<RenderData<D>>;
 }
 
@@ -79,6 +80,11 @@ macro_rules! shape {
         }
 
         impl $name {
+            pub fn with_color(mut self, color: Color) -> Self {
+                self.color = color;
+                self
+            }
+
             /// Shape dimensions are in meters.
             pub fn new($($arg: f32),+) -> Self {
                 Self {
@@ -105,3 +111,24 @@ macro_rules! shape {
 shape!(Circle, TwoD, circle, radius);
 shape!(Rectangle, TwoD, rectangle, width, height);
 shape!(Cube, ThreeD, cube, width, height, length);
+
+macro_rules! position_2d {
+    ($name:ty) => {
+        impl $name {
+            pub fn at(mut self, x: f32, y: f32) -> Self {
+                self.transform.position = cgmath::Vector3::new(x, y, crate::Z);
+                self
+            }
+        }
+    };
+}
+
+position_2d!(Circle);
+position_2d!(Rectangle);
+
+impl Cube {
+    pub fn at(mut self, x: f32, y: f32, z: f32) -> Self {
+        self.transform.position = cgmath::Vector3::new(x, y, z);
+        self
+    }
+}

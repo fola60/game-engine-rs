@@ -1,6 +1,9 @@
 //! A dimension-checked collection of engine-owned game objects.
-use crate::{Dimension, Entity, EntityContext};
-use std::collections::{BTreeMap, btree_map::Entry};
+use crate::collision::Bounds;
+use crate::{
+    CollisionEvent, CollisionPhase, Dimension, Entity, EntityContext, SceneCollisionEvent,
+};
+use std::collections::{BTreeMap, BTreeSet, btree_map::Entry};
 use winit::event::WindowEvent;
 
 pub(crate) enum Command<D: Dimension> {
@@ -29,6 +32,70 @@ mod tests {
         assert_eq!(scene.take_removed(), ["first"]);
         assert!(scene.take_removed().is_empty());
     }
+
+    #[test]
+    fn collision_snapshot_reports_each_pair_once_and_preserves_entity_callbacks() {
+        struct Probe {
+            shape: Circle,
+            events: Vec<CollisionEvent>,
+        }
+        impl Entity<TwoD> for Probe {
+            fn render_data(&self) -> Option<crate::RenderData<TwoD>> {
+                self.shape.render_data()
+            }
+            fn on_collision(&mut self, _: &mut EntityContext<TwoD>, event: &CollisionEvent) {
+                self.events.push(event.clone());
+            }
+        }
+        let mut scene = Scene::<TwoD>::default();
+        for id in ["a", "b"] {
+            scene.spawn(
+                id,
+                Probe {
+                    shape: Circle::new(1.0).at(2.0, 3.0).with_color(crate::Color::Blue),
+                    events: Vec::new(),
+                },
+            );
+        }
+        for phase in [
+            CollisionPhase::Started,
+            CollisionPhase::Stayed,
+            CollisionPhase::Ended,
+        ] {
+            if phase == CollisionPhase::Ended {
+                scene
+                    .get_mut::<Probe>("b")
+                    .unwrap()
+                    .shape
+                    .transform
+                    .position
+                    .x = 20.0;
+            }
+            scene.update(0.0);
+            let events = scene.take_collision_events();
+            assert_eq!(events.len(), 1);
+            assert_eq!(events[0].phase, phase);
+            assert!(events[0].involves("a", "b") && events[0].involves("b", "a"));
+            assert!(!events[0].involves("a", "missing"));
+            assert_eq!(events[0].other_id("a"), Some("b"));
+            assert_eq!(events[0].other_id("b"), Some("a"));
+            assert_eq!(events[0].other_id("missing"), None);
+            assert!(scene.take_collision_events().is_empty());
+            for (id, other) in [("a", "b"), ("b", "a")] {
+                let probe = scene.get::<Probe>(id).unwrap();
+                assert_eq!(
+                    probe.events.last().unwrap(),
+                    &CollisionEvent {
+                        other_id: other.into(),
+                        phase
+                    }
+                );
+            }
+        }
+        scene.update(0.0);
+        assert!(scene.take_collision_events().is_empty());
+        assert_eq!(scene.get::<Probe>("a").unwrap().events.len(), 3);
+    }
 }
 
 struct Registered<D: Dimension> {
@@ -41,6 +108,8 @@ pub struct Scene<D: Dimension> {
     entities: BTreeMap<String, Registered<D>>,
     commands: Vec<Command<D>>,
     removed: Vec<String>,
+    contacts: BTreeSet<(String, String)>,
+    collision_events: Vec<SceneCollisionEvent>,
 }
 
 impl<D: Dimension> Default for Scene<D> {
@@ -49,6 +118,8 @@ impl<D: Dimension> Default for Scene<D> {
             entities: BTreeMap::new(),
             commands: Vec::new(),
             removed: Vec::new(),
+            contacts: BTreeSet::new(),
+            collision_events: Vec::new(),
         }
     }
 }
@@ -85,8 +156,10 @@ impl<D: Dimension> Scene<D> {
         (entity as &mut dyn std::any::Any).downcast_mut()
     }
 
+    /// Removes the entity and clears its contacts
     pub fn despawn(&mut self, id: &str) -> bool {
         if self.entities.remove(id).is_some() {
+            self.contacts.retain(|(a, b)| a != id && b != id);
             self.removed.push(id.to_owned());
             true
         } else {
@@ -94,7 +167,7 @@ impl<D: Dimension> Scene<D> {
         }
     }
 
-    /// Apply last frame's commands, initialize new objects, then update all objects.
+    /// Apply queued commands, initialize and update entities, then detect collisions.
     pub fn update(&mut self, dt: f32) {
         for command in std::mem::take(&mut self.commands) {
             match command {
@@ -133,6 +206,69 @@ impl<D: Dimension> Scene<D> {
                 dt,
             );
         }
+        self.detect_collisions();
+    }
+
+    fn detect_collisions(&mut self) {
+        let bounds: Vec<_> = self
+            .entities
+            .iter()
+            .filter_map(|(id, entry)| {
+                let data = entry.entity.render_data()?;
+                Bounds::from_render_data(&data).map(|bounds| (id.clone(), bounds))
+            })
+            .collect();
+        let mut contacts = BTreeSet::new();
+        let mut events = Vec::new();
+        for i in 0..bounds.len() {
+            for j in (i + 1)..bounds.len() {
+                let (a, a_bounds) = &bounds[i];
+                let (b, b_bounds) = &bounds[j];
+                if a_bounds.overlaps(b_bounds) {
+                    let pair = (a.clone(), b.clone());
+                    let phase = if self.contacts.contains(&pair) {
+                        CollisionPhase::Stayed
+                    } else {
+                        CollisionPhase::Started
+                    };
+                    events.push((pair.clone(), phase));
+                    contacts.insert(pair);
+                }
+            }
+        }
+        for pair in self.contacts.difference(&contacts) {
+            events.push((pair.clone(), CollisionPhase::Ended));
+        }
+        self.contacts = contacts;
+        self.collision_events = events
+            .iter()
+            .map(|((a, b), phase)| SceneCollisionEvent {
+                a_id: a.clone(),
+                b_id: b.clone(),
+                phase: *phase,
+            })
+            .collect();
+        for ((a, b), phase) in events {
+            for (id, other_id) in [(&a, &b), (&b, &a)] {
+                if let Some(entry) = self.entities.get_mut(id) {
+                    entry.entity.on_collision(
+                        &mut EntityContext {
+                            id,
+                            commands: &mut self.commands,
+                        },
+                        &CollisionEvent {
+                            other_id: other_id.clone(),
+                            phase,
+                        },
+                    );
+                }
+            }
+        }
+    }
+
+    /// Takes the latest update's collision snapshot, once per pair.
+    pub fn take_collision_events(&mut self) -> Vec<SceneCollisionEvent> {
+        std::mem::take(&mut self.collision_events)
     }
 
     /// Input is delivered only after an entity's initialization hooks.

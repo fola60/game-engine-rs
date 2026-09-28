@@ -7,6 +7,8 @@ pub mod renderer;
 pub mod entity;
 pub mod geometry;
 pub mod scene;
+pub mod collision;
+mod input;
 pub mod render_object;
 pub mod engine_context;
 pub mod model;
@@ -17,6 +19,7 @@ pub mod transform;
 pub mod world_units;
 
 pub use transform::Transform;
+pub use collision::{CollisionEvent, CollisionPhase, SceneCollisionEvent};
 pub use entity::{Entity, EntityContext, RenderData, Circle, Rectangle, Cube};
 pub use geometry::Mesh;
 

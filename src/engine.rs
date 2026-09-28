@@ -1,4 +1,4 @@
-use crate::{Dimension, TwoD, engine_context::EngineContext, state::State};
+use crate::{Dimension, SceneCollisionEvent, TwoD, engine_context::EngineContext, state::State};
 use std::{
     marker::PhantomData,
     sync::Arc,
@@ -78,11 +78,16 @@ impl<D: Dimension, G: GameLoop<D> + 'static> Engine<D, G> {
             self.game.update(&mut ctx, dt);
         }
         self.scene.update(dt);
+        for event in self.scene.take_collision_events() {
+            let mut ctx = EngineContext::<D>::new(state, &mut self.fps, &mut self.scene);
+            self.game.on_collision(&mut ctx, &event);
+        }
         {
             let mut ctx = EngineContext::<D>::new(state, &mut self.fps, &mut self.scene);
             self.game.render(&mut ctx);
         }
 
+        state.keyboard.finish_frame();
         state.sync_scene(&mut self.scene);
         state.update();
         match state.render() {
@@ -158,7 +163,11 @@ impl<D: Dimension, G: GameLoop<D> + 'static> ApplicationHandler for Engine<D, G>
                         ..
                     },
                 ..
-            } => state.handle_key(event_loop, *code, key_state.is_pressed()),
+            } => {
+                state.keyboard.set_key(*code, key_state.is_pressed());
+                state.handle_key(event_loop, *code, key_state.is_pressed());
+            }
+            WindowEvent::Focused(false) => state.keyboard.clear(),
             WindowEvent::SurfaceResized(size) => state.resize(size.width, size.height),
             WindowEvent::PointerMoved {
                 position, primary, ..
@@ -226,6 +235,10 @@ pub trait GameLoop<D: Dimension = TwoD> {
     fn event(&mut self, _ctx: &mut EngineContext<D>, _event: &WindowEvent) {}
 
     fn update(&mut self, _ctx: &mut EngineContext<D>, _dt: f32) {}
+
+    /// Called once per pair after entity callbacks and before rendering.
+    /// Events describe the detection snapshot, even if earlier callbacks change the scene.
+    fn on_collision(&mut self, _ctx: &mut EngineContext<D>, _event: &SceneCollisionEvent) {}
 
     fn render(&mut self, _ctx: &mut EngineContext<D>) {}
 }
